@@ -27,7 +27,7 @@ export default defineSchema({
 	canvasObjects: defineTable({
 		canvasId: v.id("canvases"),
 		creatorId: v.string(), // UUID, not Convex _id
-		type: v.string(),
+		type: v.union(v.literal("textblock")),
 		position: v.object({
 			x: v.number(),
 			y: v.number(),
@@ -36,7 +36,10 @@ export default defineSchema({
 			w: v.number(),
 			h: v.number(),
 		}),
-		content: v.any(),
+		content: v.object({
+			text: v.string(),
+			color: v.number(),
+		}),
 		expiresAt: v.optional(v.number()),
 	}).index("by_canvas", ["canvasId"]),
 });

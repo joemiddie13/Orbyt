@@ -80,6 +80,7 @@
 				bind:value={password}
 				placeholder="Password"
 				required
+				minlength="10"
 				autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
 				class="px-4 py-3 rounded-xl bg-stone-100 border border-stone-200 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 transition"
 			/>

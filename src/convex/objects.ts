@@ -45,10 +45,10 @@ export const create = mutation({
 	args: {
 		canvasId: v.id("canvases"),
 		creatorId: v.string(),
-		type: v.string(),
+		type: v.union(v.literal("textblock")),
 		position: v.object({ x: v.number(), y: v.number() }),
 		size: v.object({ w: v.number(), h: v.number() }),
-		content: v.any(),
+		content: v.object({ text: v.string(), color: v.number() }),
 	},
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx);
