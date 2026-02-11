@@ -20,6 +20,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
 			enabled: true,
 			requireEmailVerification: false,
 			minPasswordLength: 10,
+			maxPasswordLength: 64,
 		},
 		plugins: [
 			convex({ authConfig }),

@@ -2,6 +2,19 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { authComponent } from "./auth";
 
+/** Canvas bounds — objects must stay within these limits */
+const CANVAS_MAX_X = 3000;
+const CANVAS_MAX_Y = 2000;
+const MAX_OBJECT_SIZE = 1000;
+const MAX_TEXT_LENGTH = 5000;
+
+/** Validate position is within canvas bounds */
+function validatePosition(position: { x: number; y: number }) {
+	if (position.x < 0 || position.x > CANVAS_MAX_X || position.y < 0 || position.y > CANVAS_MAX_Y) {
+		throw new Error(`Position must be within canvas bounds (0–${CANVAS_MAX_X}, 0–${CANVAS_MAX_Y})`);
+	}
+}
+
 /** Verify the caller is authenticated and return their Astrophage user */
 async function getAuthenticatedUser(ctx: any) {
 	const authUser = await authComponent.getAuthUser(ctx).catch(() => null);
@@ -53,6 +66,15 @@ export const create = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx);
 
+		// Validate bounds and content
+		validatePosition(args.position);
+		if (args.size.w <= 0 || args.size.w > MAX_OBJECT_SIZE || args.size.h <= 0 || args.size.h > MAX_OBJECT_SIZE) {
+			throw new Error(`Object size must be between 1 and ${MAX_OBJECT_SIZE}`);
+		}
+		if (args.content.text.length < 1 || args.content.text.length > MAX_TEXT_LENGTH) {
+			throw new Error(`Text must be 1–${MAX_TEXT_LENGTH} characters`);
+		}
+
 		// Verify caller owns the canvas
 		const canvas = await ctx.db.get(args.canvasId);
 		if (!canvas || canvas.ownerId !== user.uuid) {
@@ -79,6 +101,7 @@ export const updatePosition = mutation({
 	},
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx);
+		validatePosition(args.position);
 
 		const obj = await ctx.db.get(args.id);
 		if (!obj) throw new Error("Object not found");

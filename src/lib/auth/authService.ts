@@ -41,8 +41,8 @@ export async function signUp(params: SignUpParams): Promise<{ error?: string }> 
 				username: params.username,
 				displayName: params.displayName || params.username,
 			});
-		} catch (err) {
-			console.error("Failed to create Astrophage user record:", err);
+		} catch {
+			console.error("Failed to create user record");
 		}
 	}
 

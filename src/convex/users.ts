@@ -16,6 +16,14 @@ export const createUser = mutation({
 			throw new Error("Not authorized to create this user");
 		}
 
+		// Validate string lengths
+		if (args.username.length < 3 || args.username.length > 30) {
+			throw new Error("Username must be 3–30 characters");
+		}
+		if (args.displayName.length < 1 || args.displayName.length > 50) {
+			throw new Error("Display name must be 1–50 characters");
+		}
+
 		// Check if user already exists for this auth account
 		const existing = await ctx.db
 			.query("users")
@@ -60,10 +68,13 @@ export const getByAuthAccount = query({
 	},
 });
 
-/** Look up an Astrophage user by UUID */
+/** Look up an Astrophage user by UUID (auth-protected — profiles are private) */
 export const getByUuid = query({
 	args: { uuid: v.string() },
 	handler: async (ctx, args) => {
+		const authUser = await authComponent.getAuthUser(ctx).catch(() => null);
+		if (!authUser) return null;
+
 		return ctx.db
 			.query("users")
 			.withIndex("by_uuid", (q) => q.eq("uuid", args.uuid))

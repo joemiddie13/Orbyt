@@ -81,6 +81,12 @@ The canvas IS the app. There are no traditional HTML pages or route-based views.
 
 **Data model**: Users have platform-agnostic UUIDs (not Convex internal IDs) for portability. Each user gets an auto-created personal canvas on signup.
 
+## Security Roadmap
+
+Authentication currently uses username/password via Better Auth. The auth layer is abstracted behind a single service file, designed for easy migration.
+
+**Next step: Passkeys.** Passwordless, phishing-resistant authentication using device biometrics (Face ID, Touch ID, Windows Hello). No passwords to steal, no emails to leak. This aligns with the app's privacy-first philosophy and the eventual move to AT Protocol's decentralized identity (DIDs).
+
 ## Project Status
 
 - **Layer 1** — Canvas foundation (pan/zoom, drag-drop, TextBlock objects)
