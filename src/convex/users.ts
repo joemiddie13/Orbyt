@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { authComponent } from "./auth";
 
 /** Create a new Astrophage user with a UUID and auto-create their personal canvas */
 export const createUser = mutation({
@@ -9,6 +10,12 @@ export const createUser = mutation({
 		displayName: v.string(),
 	},
 	handler: async (ctx, args) => {
+		// Verify the caller is authenticated and matches the claimed authAccountId
+		const authUser = await authComponent.getAuthUser(ctx).catch(() => null);
+		if (!authUser || authUser._id !== args.authAccountId) {
+			throw new Error("Not authorized to create this user");
+		}
+
 		// Check if user already exists for this auth account
 		const existing = await ctx.db
 			.query("users")
@@ -38,10 +45,14 @@ export const createUser = mutation({
 	},
 });
 
-/** Look up an Astrophage user by their Better Auth account ID */
+/** Look up an Astrophage user by their Better Auth account ID (auth-protected) */
 export const getByAuthAccount = query({
 	args: { authAccountId: v.string() },
 	handler: async (ctx, args) => {
+		// Verify the caller is authenticated and requesting their own record
+		const authUser = await authComponent.getAuthUser(ctx).catch(() => null);
+		if (!authUser || authUser._id !== args.authAccountId) return null;
+
 		return ctx.db
 			.query("users")
 			.withIndex("by_auth_account", (q) => q.eq("authAccountId", args.authAccountId))
