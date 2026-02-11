@@ -4,6 +4,8 @@ A non-addictive social connection platform. No feeds, no algorithms, no like cou
 
 The entire UI is a PixiJS canvas — not a traditional web page. Users place objects on bounded canvases, create beacons (spontaneous or planned events), and connect in real life.
 
+Built for the [**Built with Opus 4.6**](https://cerebralvalley.ai/e/claude-code-hackathon) hackathon, hosted by [Cerebral Valley](https://cerebralvalley.ai) & [Anthropic](https://anthropic.com). ([announcement](https://x.com/claudeai/status/2019833113418035237))
+
 ## Philosophy
 
 - **Open, see your people, make plans, close.** The app is designed to encourage closing it.
