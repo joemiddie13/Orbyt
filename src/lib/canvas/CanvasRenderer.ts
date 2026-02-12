@@ -1,4 +1,4 @@
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
 import * as TWEEN from '@tweenjs/tween.js';
 import { PanZoom } from './interactions/PanZoom';
 import { TextBlock } from './objects/TextBlock';
@@ -19,6 +19,15 @@ const CANVAS_WIDTH = 3000;
 const CANVAS_HEIGHT = 2000;
 const BACKGROUND_COLOR = 0x0a0a1a; // Deep space
 const CANVAS_COLOR = 0xe8e0d4; // Warm parchment, a few tints darker
+
+/** Deterministic colors for remote cursors based on username hash */
+const CURSOR_COLORS = [
+	0x4FC3F7, 0xAED581, 0xFFB74D, 0xF06292, 0xBA68C8,
+	0x4DB6AC, 0xFFD54F, 0xFF8A65, 0x7986CB, 0xA1887F,
+];
+
+const CURSOR_FADE_MS = 3000; // Fade out after 3s no update
+const CURSOR_HIDE_MS = 5000; // Remove after 5s
 
 /** Shape of a canvas object from Convex */
 export interface CanvasObjectData {
@@ -44,8 +53,14 @@ export class CanvasRenderer {
 	/** Map from sticker _id → StickerReaction */
 	private stickers = new Map<string, StickerReaction>();
 
+	/** Remote cursor visuals: userId → { container, lastUpdate } */
+	private remoteCursors = new Map<string, { container: Container; lastUpdate: number }>();
+
 	/** Callback for when an object is dragged to a new position */
 	onObjectMoved?: (objectId: string, x: number, y: number) => void;
+
+	/** Callback for when an object is being dragged (intermediate positions) */
+	onObjectDragging?: (objectId: string, x: number, y: number) => void;
 
 	/** Callback for when a beacon is tapped */
 	onBeaconTapped?: (objectId: string) => void;
@@ -74,9 +89,10 @@ export class CanvasRenderer {
 		this.drawBounds();
 		this.panZoom = new PanZoom(this.app, this.world, this.canvasWidth, this.canvasHeight);
 
-		// Integrate tween.js into the PixiJS render loop
+		// Integrate tween.js into the PixiJS render loop + cursor staleness check
 		this.app.ticker.add(() => {
 			TWEEN.update();
+			this.updateCursorStaleness();
 		});
 	}
 
@@ -117,6 +133,7 @@ export class CanvasRenderer {
 				const block = new TextBlock(text, obj.position.x, obj.position.y, color, {
 					objectId: obj._id,
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
+					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
 					onLongPress: (id, sx, sy) => this.onObjectLongPress?.(id, sx, sy),
 				});
 				this.world.addChild(block.container);
@@ -128,6 +145,7 @@ export class CanvasRenderer {
 					objectId: obj._id,
 					isExpired,
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
+					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
 					onTap: (id) => this.onBeaconTapped?.(id),
 					onLongPress: (id, sx, sy) => this.onObjectLongPress?.(id, sx, sy),
 				});
@@ -183,6 +201,119 @@ export class CanvasRenderer {
 		};
 	}
 
+	/** Convert screen coordinates to world coordinates */
+	screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
+		return {
+			x: (screenX - this.world.x) / this.world.scale.x,
+			y: (screenY - this.world.y) / this.world.scale.y,
+		};
+	}
+
+	/** Show or update a remote user's cursor on the canvas */
+	updateRemoteCursor(userId: string, username: string, worldX: number, worldY: number) {
+		let entry = this.remoteCursors.get(userId);
+
+		if (!entry) {
+			const container = this.createCursorVisual(userId, username);
+			this.world.addChild(container);
+			entry = { container, lastUpdate: Date.now() };
+			this.remoteCursors.set(userId, entry);
+		}
+
+		entry.container.x = worldX;
+		entry.container.y = worldY;
+		entry.container.alpha = 1;
+		entry.container.visible = true;
+		entry.lastUpdate = Date.now();
+	}
+
+	/** Remove a remote cursor (e.g. peer disconnected) */
+	removeRemoteCursor(userId: string) {
+		const entry = this.remoteCursors.get(userId);
+		if (entry) {
+			this.world.removeChild(entry.container);
+			entry.container.destroy({ children: true });
+			this.remoteCursors.delete(userId);
+		}
+	}
+
+	/** Remove all remote cursors (e.g. canvas switch) */
+	removeAllRemoteCursors() {
+		for (const [id] of this.remoteCursors) {
+			this.removeRemoteCursor(id);
+		}
+	}
+
+	/** Move an object's visual via WebRTC (no Convex, just preview) */
+	moveObjectRemotely(objectId: string, x: number, y: number) {
+		const obj = this.objects.get(objectId);
+		if (obj) {
+			obj.container.x = x;
+			obj.container.y = y;
+		}
+	}
+
+	private createCursorVisual(userId: string, username: string): Container {
+		const container = new Container();
+		const color = this.getCursorColor(userId);
+
+		// Arrow pointer
+		const arrow = new Graphics();
+		arrow.moveTo(0, 0);
+		arrow.lineTo(0, 18);
+		arrow.lineTo(5, 14);
+		arrow.lineTo(10, 22);
+		arrow.lineTo(13, 20);
+		arrow.lineTo(8, 12);
+		arrow.lineTo(14, 10);
+		arrow.closePath();
+		arrow.fill(color);
+		arrow.stroke({ width: 1.5, color: 0xffffff });
+		container.addChild(arrow);
+
+		// Username label pill
+		const style = new TextStyle({
+			fontFamily: 'system-ui, -apple-system, sans-serif',
+			fontSize: 11,
+			fill: 0xffffff,
+		});
+		const label = new Text({ text: username, style });
+		label.x = 16;
+		label.y = 16;
+
+		const pill = new Graphics();
+		pill.roundRect(12, 13, label.width + 10, 18, 9);
+		pill.fill({ color, alpha: 0.9 });
+		container.addChild(pill);
+		container.addChild(label);
+
+		return container;
+	}
+
+	/** Fade/hide stale cursors in the render loop */
+	private updateCursorStaleness() {
+		const now = Date.now();
+		for (const [userId, entry] of this.remoteCursors) {
+			const age = now - entry.lastUpdate;
+			if (age > CURSOR_HIDE_MS) {
+				entry.container.visible = false;
+			} else if (age > CURSOR_FADE_MS) {
+				// Fade from 1.0 to 0.0 over the fade→hide window
+				const fadeProgress = (age - CURSOR_FADE_MS) / (CURSOR_HIDE_MS - CURSOR_FADE_MS);
+				entry.container.alpha = 1 - fadeProgress;
+			}
+		}
+	}
+
+	/** Deterministic color for a userId */
+	private getCursorColor(userId: string): number {
+		let hash = 0;
+		for (let i = 0; i < userId.length; i++) {
+			hash = (hash * 31 + userId.charCodeAt(i)) | 0;
+		}
+		return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
+	}
+
 	private drawBounds() {
 		// Filled canvas area — stands out against the space background
 		const fill = new Graphics();
@@ -193,6 +324,7 @@ export class CanvasRenderer {
 	}
 
 	destroy() {
+		this.removeAllRemoteCursors();
 		this.app.destroy(true, { children: true });
 	}
 }

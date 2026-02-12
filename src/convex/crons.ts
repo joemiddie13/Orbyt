@@ -10,4 +10,18 @@ crons.interval(
 	internal.beacons.cleanupExpired
 );
 
+// Clean up stale signaling messages every 5 minutes
+crons.interval(
+	"cleanup stale signals",
+	{ minutes: 5 },
+	internal.signaling.cleanupStaleSignals
+);
+
+// Clean up stale presence records every 2 minutes
+crons.interval(
+	"cleanup stale presence",
+	{ minutes: 2 },
+	internal.presence.cleanupStalePresence
+);
+
 export default crons;

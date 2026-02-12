@@ -1,20 +1,17 @@
 <script lang="ts">
-	import { useQuery } from 'convex-svelte';
-	import { api } from '$convex/_generated/api';
-
 	let {
 		activeCanvasId,
+		canvases,
 		onSelect,
 		onCreateNew,
 		onClose,
 	}: {
 		activeCanvasId: string | null;
+		canvases: any[] | undefined;
 		onSelect: (canvasId: string, canvasName: string) => void;
 		onCreateNew: () => void;
 		onClose: () => void;
 	} = $props();
-
-	const canvases = useQuery(api.access.getAccessibleCanvases, {});
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -27,8 +24,8 @@
 		onclick={(e) => e.stopPropagation()}
 	>
 		<div class="p-2">
-			{#if canvases.data}
-				{#each canvases.data as canvas}
+			{#if canvases}
+				{#each canvases as canvas}
 					<button
 						onclick={() => onSelect(canvas._id, canvas.name)}
 						class="w-full text-left px-3 py-2 rounded-lg text-sm transition cursor-pointer flex items-center gap-2 {canvas._id === activeCanvasId ? 'bg-amber-50 text-amber-700' : 'text-stone-700 hover:bg-stone-50'}"

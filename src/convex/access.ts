@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
+import { areFriends } from "./friendships";
 
 /** Grant a user access to a canvas */
 export const grantAccess = mutation({
@@ -130,7 +131,7 @@ export const getCanvasMembers = query({
 	},
 });
 
-/** Get all canvases accessible to the current user (personal + shared) */
+/** Get all canvases accessible to the current user (personal + shared + friends') */
 export const getAccessibleCanvases = query({
 	args: {},
 	handler: async (ctx) => {
@@ -153,11 +154,41 @@ export const getAccessibleCanvases = query({
 			accessRecords.map((record) => ctx.db.get(record.canvasId))
 		);
 
+		// Friends' personal canvases
+		const asRequester = await ctx.db
+			.query("friendships")
+			.withIndex("by_requester", (q) => q.eq("requesterId", user.uuid))
+			.filter((q) => q.eq(q.field("status"), "accepted"))
+			.collect();
+		const asReceiver = await ctx.db
+			.query("friendships")
+			.withIndex("by_receiver", (q) => q.eq("receiverId", user.uuid))
+			.filter((q) => q.eq(q.field("status"), "accepted"))
+			.collect();
+
+		const friendUuids = [
+			...asRequester.map((f) => f.receiverId),
+			...asReceiver.map((f) => f.requesterId),
+		];
+
+		const friendCanvases = await Promise.all(
+			friendUuids.map((uuid) =>
+				ctx.db
+					.query("canvases")
+					.withIndex("by_owner", (q) => q.eq("ownerId", uuid))
+					.filter((q) => q.eq(q.field("type"), "personal"))
+					.first()
+			)
+		);
+
 		return [
 			...ownedCanvases.map((c) => ({ ...c, role: "owner" as const })),
 			...sharedCanvases
 				.filter(Boolean)
 				.map((c, i) => ({ ...c!, role: accessRecords[i].role })),
+			...friendCanvases
+				.filter(Boolean)
+				.map((c) => ({ ...c!, role: "viewer" as const })),
 		];
 	},
 });

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { authComponent } from "./auth";
 import { getAuthenticatedUser } from "./users";
+import { areFriends } from "./friendships";
 
 /** Canvas bounds — objects must stay within these limits */
 const CANVAS_MAX_X = 3000;
@@ -17,7 +18,7 @@ function validatePosition(position: { x: number; y: number }) {
 	}
 }
 
-/** Check if a user has access to a canvas (owner, member, or viewer) */
+/** Check if a user has access to a canvas (owner, member, viewer, or friend) */
 async function checkCanvasAccess(ctx: any, canvasId: any, userUuid: string, minRole: "viewer" | "member" | "owner" = "viewer") {
 	const canvas = await ctx.db.get(canvasId);
 	if (!canvas) throw new Error("Canvas not found");
@@ -25,20 +26,27 @@ async function checkCanvasAccess(ctx: any, canvasId: any, userUuid: string, minR
 	// Owner always has full access
 	if (canvas.ownerId === userUuid) return { canvas, role: "owner" as const };
 
-	// Check canvasAccess table for shared canvases
+	// Check canvasAccess table for explicitly shared canvases
 	const access = await ctx.db
 		.query("canvasAccess")
 		.withIndex("by_canvas_user", (q: any) => q.eq("canvasId", canvasId).eq("userId", userUuid))
 		.first();
 
-	if (!access) throw new Error("Not authorized to access this canvas");
-
-	const roleHierarchy: Record<string, number> = { viewer: 0, member: 1, owner: 2 };
-	if ((roleHierarchy[access.role] ?? 0) < (roleHierarchy[minRole] ?? 0)) {
-		throw new Error(`Requires ${minRole} access`);
+	if (access) {
+		const roleHierarchy: Record<string, number> = { viewer: 0, member: 1, owner: 2 };
+		if ((roleHierarchy[access.role] ?? 0) < (roleHierarchy[minRole] ?? 0)) {
+			throw new Error(`Requires ${minRole} access`);
+		}
+		return { canvas, role: access.role };
 	}
 
-	return { canvas, role: access.role };
+	// Friends get viewer access to personal canvases
+	if (canvas.type === "personal" && minRole === "viewer") {
+		const friends = await areFriends(ctx, userUuid, canvas.ownerId);
+		if (friends) return { canvas, role: "viewer" as const };
+	}
+
+	throw new Error("Not authorized to access this canvas");
 }
 
 /** Content validator for textblock type */
@@ -75,13 +83,18 @@ export const getByCanvas = query({
 		const canvas = await ctx.db.get(args.canvasId);
 		if (!canvas) return [];
 
-		// Check access: owner or has canvasAccess entry
+		// Check access: owner, canvasAccess entry, or friend (for personal canvases)
 		if (canvas.ownerId !== user.uuid) {
 			const access = await ctx.db
 				.query("canvasAccess")
 				.withIndex("by_canvas_user", (q) => q.eq("canvasId", args.canvasId).eq("userId", user.uuid))
 				.first();
-			if (!access) return [];
+			if (!access) {
+				// Check if this is a friend's personal canvas
+				if (canvas.type !== "personal" || !(await areFriends(ctx, user.uuid, canvas.ownerId))) {
+					return [];
+				}
+			}
 		}
 
 		return ctx.db

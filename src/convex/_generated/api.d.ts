@@ -16,7 +16,9 @@ import type * as crons from "../crons.js";
 import type * as friendships from "../friendships.js";
 import type * as http from "../http.js";
 import type * as objects from "../objects.js";
+import type * as presence from "../presence.js";
 import type * as responses from "../responses.js";
+import type * as signaling from "../signaling.js";
 import type * as stickers from "../stickers.js";
 import type * as users from "../users.js";
 
@@ -35,7 +37,9 @@ declare const fullApi: ApiFromModules<{
   friendships: typeof friendships;
   http: typeof http;
   objects: typeof objects;
+  presence: typeof presence;
   responses: typeof responses;
+  signaling: typeof signaling;
   stickers: typeof stickers;
   users: typeof users;
 }>;

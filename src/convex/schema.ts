@@ -94,4 +94,29 @@ export default defineSchema({
 		position: v.object({ x: v.number(), y: v.number() }),
 		createdAt: v.number(),
 	}).index("by_object", ["objectId"]),
+
+	signalingMessages: defineTable({
+		canvasId: v.id("canvases"),
+		fromUserId: v.string(), // UUID
+		toUserId: v.string(), // UUID
+		type: v.union(
+			v.literal("offer"),
+			v.literal("answer"),
+			v.literal("ice-candidate"),
+		),
+		payload: v.string(), // JSON-serialized SDP/ICE
+		createdAt: v.number(),
+	})
+		.index("by_canvas_recipient", ["canvasId", "toUserId"])
+		.index("by_created", ["createdAt"]),
+
+	canvasPresence: defineTable({
+		canvasId: v.id("canvases"),
+		userId: v.string(), // UUID
+		username: v.string(),
+		displayName: v.string(),
+		lastSeen: v.number(),
+	})
+		.index("by_canvas", ["canvasId"])
+		.index("by_canvas_user", ["canvasId", "userId"]),
 });

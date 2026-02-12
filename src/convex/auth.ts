@@ -24,7 +24,12 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
 		},
 		plugins: [
 			convex({ authConfig }),
-			username(),
+			username({
+				usernameValidator: (username) => {
+					// Allow letters, numbers, hyphens, underscores (3-30 chars)
+					return /^[a-zA-Z0-9_-]{3,30}$/.test(username);
+				},
+			}),
 		],
 	});
 };

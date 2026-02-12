@@ -9,6 +9,7 @@
 		onFriends,
 		onFriendsList,
 		onCanvasSwitcher,
+		webrtcConnected = false,
 	}: {
 		username: string;
 		canvasName?: string;
@@ -17,6 +18,7 @@
 		onFriends: () => void;
 		onFriendsList: () => void;
 		onCanvasSwitcher: () => void;
+		webrtcConnected?: boolean;
 	} = $props();
 
 	let isSigningOut = $state(false);
@@ -28,8 +30,14 @@
 </script>
 
 <div class="fixed top-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg border border-stone-200/50">
-	<span class="text-sm font-medium text-stone-600">
+	<span class="text-sm font-medium text-stone-600 flex items-center gap-1.5">
 		{username}
+		{#if webrtcConnected}
+			<span
+				class="w-2 h-2 rounded-full bg-emerald-400"
+				title="Real-time connected"
+			></span>
+		{/if}
 	</span>
 
 	<div class="w-px h-5 bg-stone-200"></div>

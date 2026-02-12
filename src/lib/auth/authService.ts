@@ -19,7 +19,8 @@ export function initAuthService(client: any) {
  * After auth signup, creates the Astrophage user record + personal canvas.
  */
 export async function signUp(params: SignUpParams): Promise<{ error?: string }> {
-	const placeholderEmail = `${params.username}@astrophage.local`;
+	const sanitized = params.username.replace(/[^a-zA-Z0-9]/g, '');
+	const placeholderEmail = `${sanitized}@astrophage.local`;
 
 	const result = await authClient.signUp.email({
 		email: placeholderEmail,
@@ -32,17 +33,23 @@ export async function signUp(params: SignUpParams): Promise<{ error?: string }> 
 		return { error: result.error.message ?? "Sign up failed" };
 	}
 
-	// Create Astrophage user record + personal canvas in Convex
+	// Create Astrophage user record + personal canvas in Convex.
+	// Retry because the auth token takes time to propagate to the Convex client.
 	if (_convexClient && result.data?.user) {
-		try {
-			const { api } = await import("$convex/_generated/api");
-			await _convexClient.mutation(api.users.createUser, {
-				authAccountId: result.data.user.id,
-				username: params.username,
-				displayName: params.displayName || params.username,
-			});
-		} catch {
-			console.error("Failed to create user record");
+		const { api } = await import("$convex/_generated/api");
+		const maxRetries = 5;
+		for (let i = 0; i < maxRetries; i++) {
+			try {
+				await _convexClient.mutation(api.users.createUser, {
+					username: params.username,
+					displayName: params.displayName || params.username,
+				});
+				break;
+			} catch {
+				if (i < maxRetries - 1) {
+					await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+				}
+			}
 		}
 	}
 

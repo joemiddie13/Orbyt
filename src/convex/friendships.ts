@@ -2,6 +2,23 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
 
+/** Check if two users are friends (accepted friendship in either direction) */
+export async function areFriends(ctx: any, uuidA: string, uuidB: string): Promise<boolean> {
+	const forward = await ctx.db
+		.query("friendships")
+		.withIndex("by_pair", (q: any) => q.eq("requesterId", uuidA).eq("receiverId", uuidB))
+		.filter((q: any) => q.eq(q.field("status"), "accepted"))
+		.first();
+	if (forward) return true;
+
+	const reverse = await ctx.db
+		.query("friendships")
+		.withIndex("by_pair", (q: any) => q.eq("requesterId", uuidB).eq("receiverId", uuidA))
+		.filter((q: any) => q.eq(q.field("status"), "accepted"))
+		.first();
+	return !!reverse;
+}
+
 /** Send a friend request by entering someone's friend code */
 export const sendRequest = mutation({
 	args: { friendCode: v.string() },

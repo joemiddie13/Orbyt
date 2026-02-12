@@ -22,6 +22,8 @@ export interface TextBlockOptions {
 	objectId?: string;
 	/** Called when the user finishes dragging this block */
 	onDragEnd?: (objectId: string, x: number, y: number) => void;
+	/** Called continuously during drag with intermediate positions */
+	onDragMove?: (objectId: string, x: number, y: number) => void;
 	/** Called on long-press (500ms hold) — triggers sticker picker */
 	onLongPress?: (objectId: string, screenX: number, screenY: number) => void;
 }
@@ -78,6 +80,11 @@ export class TextBlock {
 			onDragEnd: (finalX, finalY) => {
 				if (this.objectId && options.onDragEnd) {
 					options.onDragEnd(this.objectId, finalX, finalY);
+				}
+			},
+			onDragMove: (x, y) => {
+				if (this.objectId && options.onDragMove) {
+					options.onDragMove(this.objectId, x, y);
 				}
 			},
 			onLongPress: (screenX, screenY) => {

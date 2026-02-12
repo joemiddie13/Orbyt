@@ -39,16 +39,17 @@ export async function getAuthenticatedUser(ctx: any) {
 /** Create a new Astrophage user with a UUID and auto-create their personal canvas */
 export const createUser = mutation({
 	args: {
-		authAccountId: v.string(),
 		username: v.string(),
 		displayName: v.string(),
 	},
 	handler: async (ctx, args) => {
-		// Verify the caller is authenticated and matches the claimed authAccountId
+		// Derive auth account ID from the session — don't trust client input
 		const authUser = await authComponent.getAuthUser(ctx).catch(() => null);
-		if (!authUser || authUser._id !== args.authAccountId) {
-			throw new Error("Not authorized to create this user");
+		if (!authUser) {
+			throw new Error("Not authenticated");
 		}
+
+		const authAccountId = authUser._id;
 
 		// Validate string lengths
 		if (args.username.length < 3 || args.username.length > 30) {
@@ -61,7 +62,7 @@ export const createUser = mutation({
 		// Check if user already exists for this auth account
 		const existing = await ctx.db
 			.query("users")
-			.withIndex("by_auth_account", (q) => q.eq("authAccountId", args.authAccountId))
+			.withIndex("by_auth_account", (q) => q.eq("authAccountId", authAccountId))
 			.first();
 
 		if (existing) return existing._id;
@@ -71,7 +72,7 @@ export const createUser = mutation({
 
 		const userId = await ctx.db.insert("users", {
 			uuid,
-			authAccountId: args.authAccountId,
+			authAccountId,
 			username: args.username,
 			displayName: args.displayName,
 			friendCode,

@@ -17,6 +17,8 @@ const LONG_PRESS_THRESHOLD = 5;
 export interface DragDropOptions {
 	/** Called when a drag ends with the final position */
 	onDragEnd?: (x: number, y: number) => void;
+	/** Called continuously during drag with intermediate positions */
+	onDragMove?: (x: number, y: number) => void;
 	/** Called on long-press (500ms hold without movement) with screen coordinates */
 	onLongPress?: (screenX: number, screenY: number) => void;
 }
@@ -86,6 +88,8 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 
 		target.x = worldX - offsetX;
 		target.y = worldY - offsetY;
+
+		options.onDragMove?.(target.x, target.y);
 	});
 
 	function endDrag() {

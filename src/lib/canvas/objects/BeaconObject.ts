@@ -32,6 +32,7 @@ export interface BeaconContent {
 export interface BeaconObjectOptions {
 	objectId?: string;
 	onDragEnd?: (objectId: string, x: number, y: number) => void;
+	onDragMove?: (objectId: string, x: number, y: number) => void;
 	onTap?: (objectId: string) => void;
 	onLongPress?: (objectId: string, screenX: number, screenY: number) => void;
 	isExpired?: boolean;
@@ -160,6 +161,11 @@ export class BeaconObject {
 			onDragEnd: (finalX, finalY) => {
 				if (this.objectId && options.onDragEnd) {
 					options.onDragEnd(this.objectId, finalX, finalY);
+				}
+			},
+			onDragMove: (x, y) => {
+				if (this.objectId && options.onDragMove) {
+					options.onDragMove(this.objectId, x, y);
 				}
 			},
 			onLongPress: (screenX, screenY) => {
