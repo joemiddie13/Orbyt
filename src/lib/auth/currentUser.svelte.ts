@@ -41,6 +41,7 @@ export function useCurrentUser() {
 						username: astroUser.username,
 						displayName: astroUser.displayName,
 						avatarUrl: astroUser.avatarUrl,
+						friendCode: astroUser.friendCode,
 					}
 				: {
 						// Fallback if Astrophage record hasn't been created yet

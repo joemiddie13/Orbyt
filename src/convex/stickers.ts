@@ -1,0 +1,74 @@
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+import { getAuthenticatedUser } from "./users";
+
+const VALID_STICKER_TYPES = ['heart', 'fire', 'laugh', 'wave', 'star', '100', 'thumbs-up', 'eyes'];
+
+/** Add a sticker reaction to a canvas object */
+export const addSticker = mutation({
+	args: {
+		objectId: v.id("canvasObjects"),
+		stickerType: v.string(),
+		position: v.object({ x: v.number(), y: v.number() }),
+	},
+	handler: async (ctx, args) => {
+		const user = await getAuthenticatedUser(ctx);
+
+		if (!VALID_STICKER_TYPES.includes(args.stickerType)) {
+			throw new Error("Invalid sticker type");
+		}
+
+		// Verify the object exists
+		const obj = await ctx.db.get(args.objectId);
+		if (!obj) throw new Error("Object not found");
+
+		return ctx.db.insert("stickerReactions", {
+			objectId: args.objectId,
+			userId: user.uuid,
+			stickerType: args.stickerType,
+			position: args.position,
+			createdAt: Date.now(),
+		});
+	},
+});
+
+/** Remove your own sticker from an object */
+export const removeSticker = mutation({
+	args: { stickerId: v.id("stickerReactions") },
+	handler: async (ctx, args) => {
+		const user = await getAuthenticatedUser(ctx);
+
+		const sticker = await ctx.db.get(args.stickerId);
+		if (!sticker) throw new Error("Sticker not found");
+		if (sticker.userId !== user.uuid) throw new Error("Can only remove your own stickers");
+
+		await ctx.db.delete(args.stickerId);
+	},
+});
+
+/** Get all stickers for objects on a canvas (batch query) */
+export const getByCanvas = query({
+	args: { canvasId: v.id("canvases") },
+	handler: async (ctx, args) => {
+		const user = await getAuthenticatedUser(ctx).catch(() => null);
+		if (!user) return [];
+
+		// Get all objects on this canvas
+		const objects = await ctx.db
+			.query("canvasObjects")
+			.withIndex("by_canvas", (q) => q.eq("canvasId", args.canvasId))
+			.collect();
+
+		// Get all stickers for each object
+		const allStickers = await Promise.all(
+			objects.map((obj) =>
+				ctx.db
+					.query("stickerReactions")
+					.withIndex("by_object", (q) => q.eq("objectId", obj._id))
+					.collect()
+			)
+		);
+
+		return allStickers.flat();
+	},
+});

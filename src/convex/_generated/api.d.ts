@@ -8,10 +8,16 @@
  * @module
  */
 
+import type * as access from "../access.js";
 import type * as auth from "../auth.js";
+import type * as beacons from "../beacons.js";
 import type * as canvases from "../canvases.js";
+import type * as crons from "../crons.js";
+import type * as friendships from "../friendships.js";
 import type * as http from "../http.js";
 import type * as objects from "../objects.js";
+import type * as responses from "../responses.js";
+import type * as stickers from "../stickers.js";
 import type * as users from "../users.js";
 
 import type {
@@ -21,10 +27,16 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  access: typeof access;
   auth: typeof auth;
+  beacons: typeof beacons;
   canvases: typeof canvases;
+  crons: typeof crons;
+  friendships: typeof friendships;
   http: typeof http;
   objects: typeof objects;
+  responses: typeof responses;
+  stickers: typeof stickers;
   users: typeof users;
 }>;
 

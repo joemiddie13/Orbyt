@@ -9,10 +9,12 @@ export default defineSchema({
 		displayName: v.string(),
 		avatarUrl: v.optional(v.string()),
 		email: v.optional(v.string()),
+		friendCode: v.optional(v.string()),
 	})
 		.index("by_uuid", ["uuid"])
 		.index("by_username", ["username"])
-		.index("by_auth_account", ["authAccountId"]),
+		.index("by_auth_account", ["authAccountId"])
+		.index("by_friend_code", ["friendCode"]),
 
 	canvases: defineTable({
 		ownerId: v.string(), // UUID, not Convex _id — portable for AT Protocol
@@ -24,10 +26,31 @@ export default defineSchema({
 		}),
 	}).index("by_owner", ["ownerId"]),
 
+	canvasAccess: defineTable({
+		canvasId: v.id("canvases"),
+		userId: v.string(), // UUID
+		role: v.union(v.literal("owner"), v.literal("member"), v.literal("viewer")),
+		invitedBy: v.string(), // UUID
+		invitedAt: v.number(),
+	})
+		.index("by_canvas", ["canvasId"])
+		.index("by_user", ["userId"])
+		.index("by_canvas_user", ["canvasId", "userId"]),
+
+	friendships: defineTable({
+		requesterId: v.string(), // UUID
+		receiverId: v.string(), // UUID
+		status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined")),
+		createdAt: v.number(),
+	})
+		.index("by_requester", ["requesterId"])
+		.index("by_receiver", ["receiverId"])
+		.index("by_pair", ["requesterId", "receiverId"]),
+
 	canvasObjects: defineTable({
 		canvasId: v.id("canvases"),
 		creatorId: v.string(), // UUID, not Convex _id
-		type: v.union(v.literal("textblock")),
+		type: v.union(v.literal("textblock"), v.literal("beacon")),
 		position: v.object({
 			x: v.number(),
 			y: v.number(),
@@ -36,10 +59,39 @@ export default defineSchema({
 			w: v.number(),
 			h: v.number(),
 		}),
-		content: v.object({
-			text: v.string(),
-			color: v.number(),
-		}),
+		content: v.union(
+			v.object({
+				text: v.string(),
+				color: v.number(),
+			}),
+			v.object({
+				title: v.string(),
+				description: v.optional(v.string()),
+				locationAddress: v.optional(v.string()),
+				startTime: v.number(),
+				endTime: v.number(),
+				visibilityType: v.union(v.literal("direct"), v.literal("canvas")),
+				directRecipients: v.optional(v.array(v.string())),
+				directBeaconGroupId: v.optional(v.string()),
+			}),
+		),
 		expiresAt: v.optional(v.number()),
 	}).index("by_canvas", ["canvasId"]),
+
+	beaconResponses: defineTable({
+		beaconId: v.id("canvasObjects"),
+		userId: v.string(), // UUID
+		status: v.union(v.literal("joining"), v.literal("interested"), v.literal("declined")),
+		respondedAt: v.number(),
+	})
+		.index("by_beacon", ["beaconId"])
+		.index("by_beacon_user", ["beaconId", "userId"]),
+
+	stickerReactions: defineTable({
+		objectId: v.id("canvasObjects"),
+		userId: v.string(), // UUID
+		stickerType: v.string(),
+		position: v.object({ x: v.number(), y: v.number() }),
+		createdAt: v.number(),
+	}).index("by_object", ["objectId"]),
 });

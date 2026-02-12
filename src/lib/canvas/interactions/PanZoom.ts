@@ -16,11 +16,13 @@ import { Container, type Application, type FederatedPointerEvent } from 'pixi.js
  * - Canvas bounds prevent panning beyond the whiteboard edges
  * - Rubber-band effect: when you hit an edge, it stretches slightly and
  *   springs back — like iOS scroll bounce
+ * - Minimum zoom is dynamic: canvas always fills at least 75% of the viewport
  */
 
-const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 2.5;
 const ZOOM_SPEED = 0.1;
+/** Canvas must fill at least this fraction of the viewport at min zoom */
+const MIN_CANVAS_FILL = 0.75;
 
 // Momentum: how quickly the canvas slows down after releasing a drag
 const FRICTION = 0.92;
@@ -56,6 +58,30 @@ export class PanZoom {
 		this.setupPan();
 		this.setupZoom();
 		this.setupMomentum();
+
+		// Center the canvas in the viewport on load
+		this.centerCanvas();
+	}
+
+	/** Calculate minimum zoom so canvas fills at least 75% of the viewport */
+	private getMinZoom(): number {
+		const screenW = this.app.screen.width;
+		const screenH = this.app.screen.height;
+		const scaleX = (screenW * MIN_CANVAS_FILL) / this.canvasWidth;
+		const scaleY = (screenH * MIN_CANVAS_FILL) / this.canvasHeight;
+		return Math.max(scaleX, scaleY);
+	}
+
+	/** Center the canvas in the viewport at a comfortable zoom */
+	private centerCanvas() {
+		const screenW = this.app.screen.width;
+		const screenH = this.app.screen.height;
+		// Start at a zoom where the canvas fits nicely
+		const fitScale = Math.min(screenW / this.canvasWidth, screenH / this.canvasHeight) * 0.9;
+		const scale = Math.max(this.getMinZoom(), Math.min(MAX_ZOOM, fitScale));
+		this.world.scale.set(scale);
+		this.world.x = (screenW - this.canvasWidth * scale) / 2;
+		this.world.y = (screenH - this.canvasHeight * scale) / 2;
 	}
 
 	/**
@@ -104,8 +130,6 @@ export class PanZoom {
 		let newY = this.world.y + dy;
 
 		// Apply rubber-band effect at the edges.
-		// Instead of hard-stopping, we allow dragging past the edge but with
-		// increasing resistance (the further you go, the less it moves).
 		const bounds = this.getBounds();
 		if (newX > bounds.maxX) {
 			const overshoot = newX - bounds.maxX;
@@ -147,16 +171,16 @@ export class PanZoom {
 		this.app.canvas.addEventListener('wheel', (event: WheelEvent) => {
 			event.preventDefault();
 
+			const minZoom = this.getMinZoom();
+
 			// deltaY > 0 = scroll down = zoom out
 			const direction = event.deltaY > 0 ? -1 : 1;
 			const newScale = Math.max(
-				MIN_ZOOM,
+				minZoom,
 				Math.min(MAX_ZOOM, this.world.scale.x + direction * ZOOM_SPEED)
 			);
 
 			// Zoom toward the pointer position.
-			// Math: adjust the world position so the point under the cursor stays
-			// under the cursor after scaling.
 			const pointerX = event.offsetX;
 			const pointerY = event.offsetY;
 			const worldPosBeforeX = (pointerX - this.world.x) / this.world.scale.x;
@@ -222,15 +246,18 @@ export class PanZoom {
 		const screenH = this.app.screen.height;
 		const padding = 100;
 
+		const rawMaxX = padding;
+		const rawMinX = screenW - this.canvasWidth * scale - padding;
+		const rawMaxY = padding;
+		const rawMinY = screenH - this.canvasHeight * scale - padding;
+
 		return {
-			// maxX/maxY: how far right/down the world can go (limited so the
-			// left/top edge of the canvas doesn't go past the viewport)
-			maxX: padding,
-			maxY: padding,
-			// minX/minY: how far left/up (limited so the right/bottom edge
-			// of the canvas stays visible)
-			minX: screenW - this.canvasWidth * scale - padding,
-			minY: screenH - this.canvasHeight * scale - padding
+			// When canvas is smaller than viewport, bounds invert — swap them
+			// so panning stays smooth and the canvas can float freely within view
+			maxX: Math.max(rawMaxX, rawMinX),
+			maxY: Math.max(rawMaxY, rawMinY),
+			minX: Math.min(rawMaxX, rawMinX),
+			minY: Math.min(rawMaxY, rawMinY),
 		};
 	}
 }

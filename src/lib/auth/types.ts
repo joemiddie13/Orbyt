@@ -5,6 +5,7 @@ export interface AuthUser {
 	username: string;
 	displayName: string;
 	avatarUrl?: string;
+	friendCode?: string;
 }
 
 export interface AuthState {

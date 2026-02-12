@@ -22,6 +22,8 @@ export interface TextBlockOptions {
 	objectId?: string;
 	/** Called when the user finishes dragging this block */
 	onDragEnd?: (objectId: string, x: number, y: number) => void;
+	/** Called on long-press (500ms hold) — triggers sticker picker */
+	onLongPress?: (objectId: string, screenX: number, screenY: number) => void;
 }
 
 export class TextBlock {
@@ -71,11 +73,16 @@ export class TextBlock {
 		this.container.addChild(this.background);
 		this.container.addChild(this.textDisplay);
 
-		// Make this block draggable, with persistence callback
+		// Make this block draggable, with persistence and long-press callbacks
 		makeDraggable(this.container, {
 			onDragEnd: (finalX, finalY) => {
 				if (this.objectId && options.onDragEnd) {
 					options.onDragEnd(this.objectId, finalX, finalY);
+				}
+			},
+			onLongPress: (screenX, screenY) => {
+				if (this.objectId && options.onLongPress) {
+					options.onLongPress(this.objectId, screenX, screenY);
 				}
 			},
 		});
