@@ -23,6 +23,61 @@ export interface DragDropOptions {
 	onLongPress?: (screenX: number, screenY: number) => void;
 }
 
+/**
+ * Makes a container respond to long-press only (no drag).
+ * Used for non-owners who can still place sticker reactions.
+ */
+export function makeLongPressable(target: Container, onLongPress: (screenX: number, screenY: number) => void) {
+	let isDown = false;
+	let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+	let startScreenX = 0;
+	let startScreenY = 0;
+	let fired = false;
+
+	target.eventMode = 'static';
+	target.cursor = 'default';
+
+	target.on('pointerdown', (event: FederatedPointerEvent) => {
+		isDown = true;
+		fired = false;
+		startScreenX = event.globalX;
+		startScreenY = event.globalY;
+		event.stopPropagation();
+
+		longPressTimer = setTimeout(() => {
+			if (isDown && !fired) {
+				fired = true;
+				isDown = false;
+				onLongPress(startScreenX, startScreenY);
+			}
+		}, LONG_PRESS_DURATION);
+	});
+
+	target.on('globalpointermove', (event: FederatedPointerEvent) => {
+		if (!isDown) return;
+		const dx = event.globalX - startScreenX;
+		const dy = event.globalY - startScreenY;
+		if (Math.sqrt(dx * dx + dy * dy) > LONG_PRESS_THRESHOLD) {
+			if (longPressTimer) {
+				clearTimeout(longPressTimer);
+				longPressTimer = null;
+			}
+		}
+	});
+
+	function endPress() {
+		isDown = false;
+		fired = false;
+		if (longPressTimer) {
+			clearTimeout(longPressTimer);
+			longPressTimer = null;
+		}
+	}
+
+	target.on('pointerup', endPress);
+	target.on('pointerupoutside', endPress);
+}
+
 export function makeDraggable(target: Container, options: DragDropOptions = {}) {
 	let isDragging = false;
 	let offsetX = 0;

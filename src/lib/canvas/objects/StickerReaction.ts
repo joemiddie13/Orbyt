@@ -51,16 +51,17 @@ export class StickerReaction {
 		emoji.anchor.set(0.5);
 		this.container.addChild(emoji);
 
-		// Pop-in animation
+		// Pop-in animation — must TWEEN.add() in v25 (tweens aren't auto-added to default group)
 		if (animate) {
 			this.container.scale.set(0);
-			new TWEEN.Tween({ s: 0 })
+			const popIn = new TWEEN.Tween({ s: 0 })
 				.to({ s: 1 }, 500)
 				.easing(TWEEN.Easing.Elastic.Out)
 				.onUpdate(({ s }) => {
 					this.container.scale.set(s);
 				})
 				.start();
+			TWEEN.add(popIn);
 		}
 	}
 }

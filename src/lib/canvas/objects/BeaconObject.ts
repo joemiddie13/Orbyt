@@ -1,6 +1,6 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import * as TWEEN from '@tweenjs/tween.js';
-import { makeDraggable } from '../interactions/DragDrop';
+import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
 
 /**
  * BeaconObject — a glowing event card on the canvas.
@@ -158,7 +158,7 @@ export class BeaconObject {
 			this.container.addChild(expText);
 		}
 
-		// Only make draggable if the user owns this canvas
+		// Owner: full drag + long-press. Visitor: long-press only (sticker reactions).
 		if (options.editable !== false) {
 			makeDraggable(this.container, {
 				onDragEnd: (finalX, finalY) => {
@@ -177,6 +177,10 @@ export class BeaconObject {
 					}
 				},
 			});
+		} else if (options.onLongPress) {
+			makeLongPressable(this.container, (screenX, screenY) => {
+				if (this.objectId) options.onLongPress!(this.objectId, screenX, screenY);
+			});
 		}
 
 		// Tap handler for viewing beacon details (works for all users)
@@ -191,15 +195,16 @@ export class BeaconObject {
 			});
 		}
 
-		// Pop-in animation
+		// Pop-in animation — must TWEEN.add() in v25 (tweens aren't auto-added to default group)
 		this.container.scale.set(0);
-		new TWEEN.Tween({ s: 0 })
+		const popIn = new TWEEN.Tween({ s: 0 })
 			.to({ s: 1 }, 400)
 			.easing(TWEEN.Easing.Back.Out)
 			.onUpdate(({ s }) => {
 				this.container.scale.set(s);
 			})
 			.start();
+		TWEEN.add(popIn);
 
 		// Start pulse if not expired
 		if (!this.isExpired) {
@@ -229,6 +234,7 @@ export class BeaconObject {
 				this.glowRing.scale.set(scale);
 			})
 			.start();
+		TWEEN.add(this.pulseTween);
 	}
 
 	stopPulse() {

@@ -1,5 +1,5 @@
 import { Container, Graphics, HTMLText, HTMLTextStyle, type FederatedPointerEvent } from 'pixi.js';
-import { makeDraggable } from '../interactions/DragDrop';
+import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
 
 /**
  * TextBlock — a sticky-note-style object on the canvas.
@@ -143,7 +143,7 @@ export class TextBlock {
 			this.createResizeZones();
 		}
 
-		// Only make draggable if the user owns this canvas
+		// Owner: full drag + long-press. Visitor: long-press only (sticker reactions).
 		if (options.editable !== false) {
 			makeDraggable(this.container, {
 				onDragEnd: (finalX, finalY) => {
@@ -161,6 +161,10 @@ export class TextBlock {
 						options.onLongPress(this.objectId, screenX, screenY);
 					}
 				},
+			});
+		} else if (options.onLongPress) {
+			makeLongPressable(this.container, (screenX, screenY) => {
+				if (this.objectId) options.onLongPress!(this.objectId, screenX, screenY);
 			});
 		}
 
