@@ -50,6 +50,13 @@ export const removeResponse = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx);
 
+		// Verify the beacon exists and caller has canvas access
+		const beacon = await ctx.db.get(args.beaconId);
+		if (!beacon || beacon.type !== "beacon") {
+			throw new Error("Beacon not found");
+		}
+		await checkCanvasAccess(ctx, beacon.canvasId, user.uuid, "viewer");
+
 		const existing = await ctx.db
 			.query("beaconResponses")
 			.withIndex("by_beacon_user", (q) => q.eq("beaconId", args.beaconId).eq("userId", user.uuid))
@@ -100,43 +107,39 @@ export const getByBeacon = query({
 	},
 });
 
-/** Get responses for a direct beacon group (aggregates across copies) */
+/** Get responses for a direct beacon group (aggregates only from accessible copies) */
 export const getByBeaconGroup = query({
 	args: { directBeaconGroupId: v.string() },
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return [];
 
-		// Full table scan to find beacons by directBeaconGroupId — acceptable for
-		// small table. If canvasObjects grows large, consider a dedicated index or table.
-		const allObjects = await ctx.db.query("canvasObjects").collect();
-		const groupBeacons = allObjects.filter((obj) => {
-			if (obj.type !== "beacon") return false;
-			const content = obj.content as any;
-			return content.directBeaconGroupId === args.directBeaconGroupId;
-		});
+		// Use index instead of full table scan
+		const groupBeacons = await ctx.db
+			.query("canvasObjects")
+			.withIndex("by_beacon_group", (q) => q.eq("directBeaconGroupId", args.directBeaconGroupId))
+			.collect();
 
-		// Verify caller has access to at least one of the beacons' canvases
-		let hasAccess = false;
+		if (groupBeacons.length === 0) return [];
+
+		// Filter to only beacons the caller can actually access (per-beacon check)
+		const accessibleBeacons = [];
 		for (const beacon of groupBeacons) {
 			try {
 				await checkCanvasAccess(ctx, beacon.canvasId, user.uuid, "viewer");
-				hasAccess = true;
-				break;
+				accessibleBeacons.push(beacon);
 			} catch {
-				// Try next beacon
+				// Caller can't see this copy — skip it
 			}
 		}
-		if (!hasAccess) return [];
+		if (accessibleBeacons.length === 0) return [];
 
-		const beaconIds = groupBeacons.map((b) => b._id);
-
-		// Aggregate responses across all copies
+		// Aggregate responses only from accessible beacons
 		const allResponses = await Promise.all(
-			beaconIds.map((id) =>
+			accessibleBeacons.map((b) =>
 				ctx.db
 					.query("beaconResponses")
-					.withIndex("by_beacon", (q) => q.eq("beaconId", id))
+					.withIndex("by_beacon", (q) => q.eq("beaconId", b._id))
 					.collect()
 			)
 		);

@@ -4,6 +4,8 @@ import { getAuthenticatedUser } from "./users";
 import { checkCanvasAccess } from "./access";
 
 const VALID_STICKER_TYPES = ['heart', 'fire', 'laugh', 'wave', 'star', '100', 'thumbs-up', 'eyes'];
+/** Sticker positions are relative to parent object — bounded to reasonable range */
+const MAX_STICKER_OFFSET = 500;
 
 /** Add a sticker reaction to a canvas object */
 export const addSticker = mutation({
@@ -19,10 +21,29 @@ export const addSticker = mutation({
 			throw new Error("Invalid sticker type");
 		}
 
+		// Validate sticker position is within reasonable bounds (relative to parent object)
+		if (
+			Math.abs(args.position.x) > MAX_STICKER_OFFSET ||
+			Math.abs(args.position.y) > MAX_STICKER_OFFSET
+		) {
+			throw new Error("Sticker position out of bounds");
+		}
+
 		// Verify the object exists and caller has canvas access
 		const obj = await ctx.db.get(args.objectId);
 		if (!obj) throw new Error("Object not found");
 		await checkCanvasAccess(ctx, obj.canvasId, user.uuid, "viewer");
+
+		// Limit stickers per user per object to prevent spam
+		const MAX_STICKERS_PER_USER = 5;
+		const existingStickers = await ctx.db
+			.query("stickerReactions")
+			.withIndex("by_object", (q) => q.eq("objectId", args.objectId))
+			.collect();
+		const userStickers = existingStickers.filter((s) => s.userId === user.uuid);
+		if (userStickers.length >= MAX_STICKERS_PER_USER) {
+			throw new Error(`Max ${MAX_STICKERS_PER_USER} stickers per object`);
+		}
 
 		return ctx.db.insert("stickerReactions", {
 			objectId: args.objectId,

@@ -66,6 +66,30 @@ export const cleanupExpired = internalMutation({
 	},
 });
 
+/** One-time backfill: copy content.directBeaconGroupId to top-level field for index */
+export const backfillBeaconGroupIds = internalMutation({
+	args: {},
+	handler: async (ctx) => {
+		const beacons = await ctx.db
+			.query("canvasObjects")
+			.withIndex("by_type_expires", (q) => q.eq("type", "beacon"))
+			.collect();
+
+		let patched = 0;
+		for (const beacon of beacons) {
+			if (beacon.directBeaconGroupId) continue; // already has it
+			const content = beacon.content as any;
+			if (content.directBeaconGroupId) {
+				await ctx.db.patch(beacon._id, {
+					directBeaconGroupId: content.directBeaconGroupId,
+				});
+				patched++;
+			}
+		}
+		return { patched };
+	},
+});
+
 /** Create a direct beacon — places copies on each recipient's personal canvas */
 export const createDirectBeacon = mutation({
 	args: {
@@ -82,11 +106,28 @@ export const createDirectBeacon = mutation({
 		if (args.title.length < 1 || args.title.length > 200) {
 			throw new Error("Title must be 1–200 characters");
 		}
+		if (args.description && args.description.length > 1000) {
+			throw new Error("Description must be 1000 characters or less");
+		}
+		if (args.locationAddress && args.locationAddress.length > 500) {
+			throw new Error("Location must be 500 characters or less");
+		}
 		if (args.startTime >= args.endTime) {
 			throw new Error("Start time must be before end time");
 		}
+		const now = Date.now();
+		const MAX_BEACON_DURATION = 90 * 24 * 60 * 60 * 1000; // 90 days
+		if (args.startTime < now - 60_000) {
+			throw new Error("Start time cannot be in the past");
+		}
+		if (args.endTime - args.startTime > MAX_BEACON_DURATION) {
+			throw new Error("Beacon duration cannot exceed 90 days");
+		}
 		if (args.recipientUuids.length === 0) {
 			throw new Error("Must have at least one recipient");
+		}
+		if (args.recipientUuids.length > 50) {
+			throw new Error("Max 50 recipients per beacon");
 		}
 
 		const groupId = crypto.randomUUID();
@@ -140,6 +181,7 @@ export const createDirectBeacon = mutation({
 					size: { w: 260, h: 100 },
 					content: beaconContent,
 					expiresAt: args.endTime,
+					directBeaconGroupId: groupId,
 				});
 				createdIds.push(id);
 			}

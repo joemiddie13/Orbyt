@@ -83,9 +83,12 @@ export default defineSchema({
 			}),
 		),
 		expiresAt: v.optional(v.number()),
+		/** Top-level field for direct beacon group lookups (indexed). Mirrors content.directBeaconGroupId. */
+		directBeaconGroupId: v.optional(v.string()),
 	})
 		.index("by_canvas", ["canvasId"])
-		.index("by_type_expires", ["type", "expiresAt"]),
+		.index("by_type_expires", ["type", "expiresAt"])
+		.index("by_beacon_group", ["directBeaconGroupId"]),
 
 	beaconResponses: defineTable({
 		beaconId: v.id("canvasObjects"),

@@ -115,12 +115,29 @@ export const create = mutation({
 				throw new Error(`Text must be 1–${MAX_TEXT_LENGTH} characters`);
 			}
 		} else if (args.type === "beacon") {
-			const content = args.content as { title: string; startTime: number; endTime: number };
+			const content = args.content as {
+				title: string; description?: string; locationAddress?: string;
+				startTime: number; endTime: number;
+			};
 			if (!content.title || content.title.length < 1 || content.title.length > MAX_TITLE_LENGTH) {
 				throw new Error(`Title must be 1–${MAX_TITLE_LENGTH} characters`);
 			}
+			if (content.description && content.description.length > 1000) {
+				throw new Error("Description must be 1000 characters or less");
+			}
+			if (content.locationAddress && content.locationAddress.length > 500) {
+				throw new Error("Location must be 500 characters or less");
+			}
 			if (content.startTime >= content.endTime) {
 				throw new Error("Start time must be before end time");
+			}
+			const now = Date.now();
+			const MAX_BEACON_DURATION = 90 * 24 * 60 * 60 * 1000; // 90 days
+			if (content.startTime < now - 60_000) {
+				throw new Error("Start time cannot be in the past");
+			}
+			if (content.endTime - content.startTime > MAX_BEACON_DURATION) {
+				throw new Error("Beacon duration cannot exceed 90 days");
 			}
 		}
 

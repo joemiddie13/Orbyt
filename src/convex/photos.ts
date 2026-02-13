@@ -6,6 +6,9 @@ import { checkCanvasAccess } from "./access";
 /** Max file size: 5MB */
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_CAPTION_LENGTH = 200;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const CANVAS_MAX_X = 3000;
+const CANVAS_MAX_Y = 2000;
 
 /** Generate a one-time upload URL for Convex file storage */
 export const generateUploadUrl = mutation({
@@ -28,11 +31,21 @@ export const createPhoto = mutation({
 		const user = await getAuthenticatedUser(ctx);
 		await checkCanvasAccess(ctx, args.canvasId, user.uuid, "member");
 
+		// Validate position within canvas bounds
+		if (args.position.x < 0 || args.position.x > CANVAS_MAX_X || args.position.y < 0 || args.position.y > CANVAS_MAX_Y) {
+			throw new Error("Position must be within canvas bounds");
+		}
+
 		// Validate the storage ID refers to a real file
 		const metadata = await ctx.storage.getMetadata(args.storageId as any);
 		if (!metadata) throw new Error("Invalid storage ID");
 		if (metadata.size > MAX_FILE_SIZE) {
 			throw new Error("File too large (max 5MB)");
+		}
+
+		// Validate file type server-side (don't trust client Content-Type)
+		if (!metadata.contentType || !ALLOWED_IMAGE_TYPES.includes(metadata.contentType)) {
+			throw new Error(`Invalid file type. Allowed: ${ALLOWED_IMAGE_TYPES.join(", ")}`);
 		}
 
 		if (args.caption && args.caption.length > MAX_CAPTION_LENGTH) {
