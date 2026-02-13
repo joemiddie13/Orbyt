@@ -106,18 +106,21 @@ export const getFriends = query({
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return [];
 
-		// Get friendships where user is requester or receiver
-		const asRequester = await ctx.db
-			.query("friendships")
-			.withIndex("by_requester", (q) => q.eq("requesterId", user.uuid))
-			.filter((q) => q.eq(q.field("status"), "accepted"))
-			.collect();
-
-		const asReceiver = await ctx.db
-			.query("friendships")
-			.withIndex("by_receiver", (q) => q.eq("receiverId", user.uuid))
-			.filter((q) => q.eq(q.field("status"), "accepted"))
-			.collect();
+		// Get friendships where user is requester or receiver (compound index = no post-filter)
+		const [asRequester, asReceiver] = await Promise.all([
+			ctx.db
+				.query("friendships")
+				.withIndex("by_requester_status", (q) =>
+					q.eq("requesterId", user.uuid).eq("status", "accepted")
+				)
+				.collect(),
+			ctx.db
+				.query("friendships")
+				.withIndex("by_receiver_status", (q) =>
+					q.eq("receiverId", user.uuid).eq("status", "accepted")
+				)
+				.collect(),
+		]);
 
 		// Resolve friend UUIDs to user records
 		const friendUuids = [
@@ -149,8 +152,9 @@ export const getPendingRequests = query({
 
 		const pending = await ctx.db
 			.query("friendships")
-			.withIndex("by_receiver", (q) => q.eq("receiverId", user.uuid))
-			.filter((q) => q.eq(q.field("status"), "pending"))
+			.withIndex("by_receiver_status", (q) =>
+				q.eq("receiverId", user.uuid).eq("status", "pending")
+			)
 			.collect();
 
 		// Resolve requester UUIDs to user records

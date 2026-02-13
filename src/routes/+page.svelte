@@ -13,8 +13,11 @@
 	import CreateCanvasModal from '$lib/components/CreateCanvasModal.svelte';
 	import CreateBeaconModal from '$lib/components/CreateBeaconModal.svelte';
 	import BeaconDetailPanel from '$lib/components/BeaconDetailPanel.svelte';
+	import NoteDetailPanel from '$lib/components/NoteDetailPanel.svelte';
+	import InlineNoteEditor from '$lib/components/InlineNoteEditor.svelte';
 	import StickerPicker from '$lib/components/StickerPicker.svelte';
 	import ViewerAvatars from '$lib/components/ViewerAvatars.svelte';
+	import { TextBlock } from '$lib/canvas/objects/TextBlock';
 
 	let canvasContainer: HTMLDivElement;
 	let renderer: CanvasRenderer;
@@ -49,7 +52,18 @@
 	let showCreateCanvas = $state(false);
 	let showCreateBeacon = $state(false);
 	let selectedBeacon = $state<any>(null);
+	let selectedNote = $state<any>(null);
 	let stickerPickerState = $state<{ objectId: string; x: number; y: number } | null>(null);
+
+	// Inline note editor state (owner-only, replaces NoteDetailPanel for owners)
+	let inlineEditState = $state<{
+		note: any;
+		screenX: number;
+		screenY: number;
+		screenWidth: number;
+		screenHeight: number;
+		scale: number;
+	} | null>(null);
 
 	// Query the user's personal canvas once we have their UUID
 	const personalCanvas = useQuery(
@@ -265,6 +279,52 @@
 			}
 		};
 
+		// Wire up note tap → inline editor (owner) or detail panel (non-owner)
+		renderer.onNoteTapped = (objectId) => {
+			const obj = canvasObjects.data?.find((o: any) => o._id === objectId);
+			if (!obj || obj.type !== 'textblock') return;
+
+			if (isCanvasOwner) {
+				// Owner: open inline editor overlay at note's screen position
+				const block = renderer.getObject(objectId);
+				if (!block || !(block instanceof TextBlock)) return;
+				const screen = renderer.worldToScreen(block.container.x, block.container.y);
+				const scale = renderer.getScale();
+				inlineEditState = {
+					note: obj,
+					screenX: screen.x,
+					screenY: screen.y,
+					screenWidth: block.width * scale,
+					screenHeight: block.height * scale,
+					scale,
+				};
+				// Hide the PixiJS note while editing (DOM overlay replaces it)
+				block.container.visible = false;
+				renderer.lockPanZoom();
+			} else {
+				// Non-owner: read-only detail panel
+				selectedNote = obj;
+			}
+		};
+
+		// Wire up resize → Convex mutations (save both position + size)
+		renderer.onObjectResized = async (objectId, x, y, width, height) => {
+			try {
+				await Promise.all([
+					client.mutation(api.objects.updatePosition, {
+						id: objectId as any,
+						position: { x: Math.round(x), y: Math.round(y) },
+					}),
+					client.mutation(api.objects.updateSize, {
+						id: objectId as any,
+						size: { w: Math.round(width), h: Math.round(height) },
+					}),
+				]);
+			} catch (err) {
+				console.error('Failed to save resize:', err);
+			}
+		};
+
 		// Wire up long-press → sticker picker
 		renderer.onObjectLongPress = (objectId, screenX, screenY) => {
 			stickerPickerState = { objectId, x: screenX, y: screenY };
@@ -364,6 +424,45 @@
 		}
 		stickerPickerState = null;
 	}
+
+	/** Close inline editor: restore PixiJS note visibility and unlock pan/zoom */
+	function closeInlineEditor() {
+		if (inlineEditState) {
+			const block = renderer.getObject(inlineEditState.note._id);
+			if (block) block.container.visible = true;
+			renderer.unlockPanZoom();
+			inlineEditState = null;
+		}
+	}
+
+	/** Save inline note edits: optimistic update + Convex mutation */
+	async function saveInlineNote(id: string, text: string, color: number) {
+		// Optimistic: update PixiJS immediately
+		const block = renderer.getObject(id);
+		if (block instanceof TextBlock) {
+			block.updateText(text);
+			block.updateColor(color);
+		}
+
+		try {
+			await client.mutation(api.objects.updateContent, {
+				id: id as any,
+				content: { text, color },
+			});
+		} catch (err) {
+			console.error('Failed to save note:', err);
+		}
+	}
+
+	/** Delete note from inline editor */
+	async function deleteInlineNote(id: string) {
+		closeInlineEditor();
+		try {
+			await client.mutation(api.objects.remove, { id: id as any });
+		} catch (err) {
+			console.error('Failed to delete note:', err);
+		}
+	}
 </script>
 
 <div bind:this={canvasContainer} class="w-screen h-screen overflow-hidden"></div>
@@ -435,6 +534,29 @@
 		beacon={selectedBeacon}
 		userUuid={currentUser.user.uuid}
 		onClose={() => { selectedBeacon = null; }}
+	/>
+{/if}
+
+{#if selectedNote && currentUser.user}
+	<NoteDetailPanel
+		note={selectedNote}
+		isOwner={isCanvasOwner}
+		onClose={() => { selectedNote = null; }}
+		onDeleted={() => { selectedNote = null; }}
+	/>
+{/if}
+
+{#if inlineEditState}
+	<InlineNoteEditor
+		note={inlineEditState.note}
+		screenX={inlineEditState.screenX}
+		screenY={inlineEditState.screenY}
+		screenWidth={inlineEditState.screenWidth}
+		screenHeight={inlineEditState.screenHeight}
+		scale={inlineEditState.scale}
+		onSave={saveInlineNote}
+		onClose={closeInlineEditor}
+		onDelete={deleteInlineNote}
 	/>
 {/if}
 

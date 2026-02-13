@@ -40,6 +40,9 @@ export class PanZoom {
 	private canvasWidth: number;
 	private canvasHeight: number;
 
+	// Lock state — suppresses all interaction during inline editing
+	private locked = false;
+
 	// Drag state
 	private isDragging = false;
 	private lastPointerX = 0;
@@ -105,7 +108,21 @@ export class PanZoom {
 		stage.on('pointerupoutside', this.onDragEnd.bind(this));
 	}
 
+	/** Lock all pan/zoom interaction (e.g. during inline editing) */
+	lock() {
+		this.locked = true;
+		this.isDragging = false;
+		this.velocityX = 0;
+		this.velocityY = 0;
+	}
+
+	/** Unlock pan/zoom interaction */
+	unlock() {
+		this.locked = false;
+	}
+
 	private onDragStart(event: FederatedPointerEvent) {
+		if (this.locked) return;
 		this.isDragging = true;
 		this.lastPointerX = event.globalX;
 		this.lastPointerY = event.globalY;
@@ -115,7 +132,7 @@ export class PanZoom {
 	}
 
 	private onDragMove(event: FederatedPointerEvent) {
-		if (!this.isDragging) return;
+		if (this.locked || !this.isDragging) return;
 
 		// How far did the pointer move since last frame?
 		const dx = event.globalX - this.lastPointerX;
@@ -170,6 +187,7 @@ export class PanZoom {
 	private setupZoom() {
 		this.app.canvas.addEventListener('wheel', (event: WheelEvent) => {
 			event.preventDefault();
+			if (this.locked) return;
 
 			const minZoom = this.getMinZoom();
 
@@ -202,7 +220,7 @@ export class PanZoom {
 	 */
 	private setupMomentum() {
 		this.app.ticker.add(() => {
-			if (this.isDragging) return;
+			if (this.locked || this.isDragging) return;
 
 			// Apply momentum
 			if (Math.abs(this.velocityX) > VELOCITY_THRESHOLD || Math.abs(this.velocityY) > VELOCITY_THRESHOLD) {

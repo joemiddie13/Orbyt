@@ -73,8 +73,14 @@ export class CanvasRenderer {
 	/** Callback for when a beacon is tapped */
 	onBeaconTapped?: (objectId: string) => void;
 
+	/** Callback for when a note is tapped */
+	onNoteTapped?: (objectId: string) => void;
+
 	/** Callback for long-press on any object (sticker picker) */
 	onObjectLongPress?: (objectId: string, screenX: number, screenY: number) => void;
+
+	/** Callback for when an object is resized (includes final position for left/top resize) */
+	onObjectResized?: (objectId: string, x: number, y: number, width: number, height: number) => void;
 
 	/** Whether the current user can edit objects on this canvas */
 	editable = true;
@@ -133,6 +139,13 @@ export class CanvasRenderer {
 				existing.container.x = obj.position.x;
 				existing.container.y = obj.position.y;
 
+				// Update text content and color for notes
+				if (obj.type === 'textblock' && existing instanceof TextBlock) {
+					existing.updateText(obj.content?.text ?? '');
+					existing.updateColor(obj.content?.color ?? 0xfff9c4);
+					existing.updateSize(obj.size?.w ?? 240, obj.size?.h ?? 0);
+				}
+
 				// Update expired state for beacons
 				if (obj.type === 'beacon' && existing instanceof BeaconObject) {
 					if (obj.expiresAt && obj.expiresAt < Date.now()) {
@@ -145,9 +158,13 @@ export class CanvasRenderer {
 				const block = new TextBlock(text, obj.position.x, obj.position.y, color, {
 					objectId: obj._id,
 					editable: this.editable,
+					initialWidth: obj.size?.w ?? 240,
+					initialHeight: obj.size?.h ?? 0,
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
 					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
 					onLongPress: (id, sx, sy) => this.onObjectLongPress?.(id, sx, sy),
+					onTap: (id) => this.onNoteTapped?.(id),
+					onResize: (id, x, y, w, h) => this.onObjectResized?.(id, x, y, w, h),
 				});
 				this.world.addChild(block.container);
 				this.objects.set(obj._id, block);
@@ -221,6 +238,34 @@ export class CanvasRenderer {
 			x: (screenX - this.world.x) / this.world.scale.x,
 			y: (screenY - this.world.y) / this.world.scale.y,
 		};
+	}
+
+	/** Convert world coordinates to screen coordinates (inverse of screenToWorld) */
+	worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
+		return {
+			x: worldX * this.world.scale.x + this.world.x,
+			y: worldY * this.world.scale.y + this.world.y,
+		};
+	}
+
+	/** Lock pan/zoom (e.g. during inline editing) */
+	lockPanZoom() {
+		this.panZoom.lock();
+	}
+
+	/** Unlock pan/zoom */
+	unlockPanZoom() {
+		this.panZoom.unlock();
+	}
+
+	/** Get the current zoom scale */
+	getScale(): number {
+		return this.world.scale.x;
+	}
+
+	/** Get a canvas object by its Convex _id */
+	getObject(objectId: string): TextBlock | BeaconObject | undefined {
+		return this.objects.get(objectId);
 	}
 
 	/** Show or update a remote user's cursor on the canvas */

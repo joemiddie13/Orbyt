@@ -1,33 +1,63 @@
-import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, HTMLText, HTMLTextStyle, type FederatedPointerEvent } from 'pixi.js';
 import { makeDraggable } from '../interactions/DragDrop';
 
 /**
  * TextBlock — a sticky-note-style object on the canvas.
  *
- * In PixiJS, you build visual objects by composing primitives:
- * - Container: groups things together (like a <div>)
- * - Graphics: draws shapes (the rounded rectangle background)
- * - Text: renders text (the content inside)
+ * Uses HTMLText to render rich-formatted content (bold, italic, headings, lists).
+ * Plain text is valid HTML and renders identically — no migration needed.
  *
- * The container holds both the background shape and the text, so when you
- * move or scale the container, everything moves together.
+ * Supports free resize via 8 handle zones (4 corners + 4 edges).
+ * Width clamped to MIN_WIDTH..MAX_WIDTH. Height minimum is text content height.
+ * Left/top resize adjusts position to keep the opposite edge fixed.
  */
 
 const PADDING = 16;
 const CORNER_RADIUS = 12;
 const DEFAULT_WIDTH = 240;
+const MIN_WIDTH = 160;
+const MAX_WIDTH = 600;
+const MIN_HEIGHT = 60;
+const MAX_HEIGHT = 1200;
+const HANDLE_SIZE = 16;
+
+/** Resize zone half-width (extends inside AND outside the note edge) */
+const EDGE_ZONE = 6;
+/** Corner zone size */
+const CORNER_ZONE = 14;
 
 export interface TextBlockOptions {
 	/** Convex document _id — links this visual to the database record */
 	objectId?: string;
 	/** Whether the current user can drag this object (default: true) */
 	editable?: boolean;
+	/** Initial width from Convex (default: 240) */
+	initialWidth?: number;
+	/** Initial height from Convex (0 = auto-fit to text) */
+	initialHeight?: number;
 	/** Called when the user finishes dragging this block */
 	onDragEnd?: (objectId: string, x: number, y: number) => void;
 	/** Called continuously during drag with intermediate positions */
 	onDragMove?: (objectId: string, x: number, y: number) => void;
 	/** Called on long-press (500ms hold) — triggers sticker picker */
 	onLongPress?: (objectId: string, screenX: number, screenY: number) => void;
+	/** Called when the user taps (no drag) this block */
+	onTap?: (objectId: string) => void;
+	/** Called when the user finishes resizing — includes final position (left/top resize shifts it) */
+	onResize?: (objectId: string, x: number, y: number, width: number, height: number) => void;
+}
+
+/**
+ * Resize zone definition.
+ * dirX/dirY encode which axes this handle controls:
+ *   1 = right/bottom edge (size grows with pointer movement)
+ *  -1 = left/top edge (size grows opposite to pointer, position shifts)
+ *   0 = no change on this axis
+ */
+interface ResizeZone {
+	graphics: Graphics;
+	dirX: number;
+	dirY: number;
 }
 
 export class TextBlock {
@@ -37,37 +67,68 @@ export class TextBlock {
 	objectId?: string;
 
 	private background: Graphics;
-	private textDisplay: Text;
+	private textDisplay: HTMLText;
 	private blockWidth: number;
 	private blockHeight: number;
+	private currentColor: number = 0xfff9c4;
+	private options: TextBlockOptions;
+	private style: HTMLTextStyle;
+
+	/** User-set minimum height (0 = auto-fit to text only) */
+	private userHeight = 0;
+	/** Resize zone handles */
+	private resizeZones: ResizeZone[] = [];
+
+	/** Public getters for overlay positioning */
+	get width(): number { return this.blockWidth; }
+	get height(): number { return this.blockHeight; }
 
 	constructor(content: string, x: number, y: number, color: number = 0xfff9c4, options: TextBlockOptions = {}) {
 		this.objectId = options.objectId;
+		this.options = options;
 		this.container = new Container();
 		this.container.x = x;
 		this.container.y = y;
+
+		// Set width from options BEFORE creating the style
+		this.blockWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, options.initialWidth ?? DEFAULT_WIDTH));
+		this.userHeight = options.initialHeight ?? 0;
 
 		// Make this container interactive
 		this.container.eventMode = 'static';
 		this.container.cursor = (options.editable !== false) ? 'grab' : 'default';
 
-		// Create the text first so we can measure it and size the background
-		const style = new TextStyle({
+		// HTMLTextStyle with tagStyles for rich text rendering
+		this.style = new HTMLTextStyle({
 			fontFamily: 'system-ui, -apple-system, sans-serif',
 			fontSize: 16,
 			fill: 0x2d2d2d,
 			wordWrap: true,
-			wordWrapWidth: DEFAULT_WIDTH - PADDING * 2,
-			lineHeight: 22
+			wordWrapWidth: this.blockWidth - PADDING * 2,
+			lineHeight: 22,
+			padding: 20,
+			tagStyles: {
+				h1: { fontSize: 24, fontWeight: 'bold' },
+				h2: { fontSize: 20, fontWeight: 'bold' },
+				h3: { fontSize: 18, fontWeight: 'bold' },
+				strong: { fontWeight: 'bold' },
+				em: { fontStyle: 'italic' },
+			},
+			cssOverrides: [
+				'ul { padding-left: 20px; list-style-type: disc; }',
+				'ol { padding-left: 20px; list-style-type: decimal; }',
+				'li { margin-bottom: 2px; }',
+				'p { margin: 2px 0; }',
+			],
 		});
 
-		this.textDisplay = new Text({ text: content, style });
+		this.textDisplay = new HTMLText({ text: content, style: this.style });
 		this.textDisplay.x = PADDING;
 		this.textDisplay.y = PADDING;
 
-		// Size the background to fit the text
-		this.blockWidth = DEFAULT_WIDTH;
-		this.blockHeight = this.textDisplay.height + PADDING * 2;
+		// Calculate height: max of text needs, user preference, and minimum
+		this.blockHeight = 0; // placeholder — recalcBlockHeight sets real value
+		this.recalcBlockHeight();
 
 		// Draw the rounded rectangle background
 		this.background = new Graphics();
@@ -77,6 +138,11 @@ export class TextBlock {
 		this.container.addChild(this.background);
 		this.container.addChild(this.textDisplay);
 
+		// Add resize zones (owner-editable notes only)
+		if (options.editable !== false) {
+			this.createResizeZones();
+		}
+
 		// Only make draggable if the user owns this canvas
 		if (options.editable !== false) {
 			makeDraggable(this.container, {
@@ -85,9 +151,9 @@ export class TextBlock {
 						options.onDragEnd(this.objectId, finalX, finalY);
 					}
 				},
-				onDragMove: (x, y) => {
+				onDragMove: (moveX, moveY) => {
 					if (this.objectId && options.onDragMove) {
-						options.onDragMove(this.objectId, x, y);
+						options.onDragMove(this.objectId, moveX, moveY);
 					}
 				},
 				onLongPress: (screenX, screenY) => {
@@ -97,10 +163,253 @@ export class TextBlock {
 				},
 			});
 		}
+
+		// Tap handler for viewing/editing note details (works for all users)
+		if (options.onTap) {
+			let didMove = false;
+			this.container.on('pointerdown', () => { didMove = false; });
+			this.container.on('globalpointermove', () => { didMove = true; });
+			this.container.on('pointerup', () => {
+				if (!didMove && this.objectId) {
+					options.onTap!(this.objectId);
+				}
+			});
+		}
+
+		// HTMLText measures async — re-check height once layout settles
+		this.scheduleHeightCheck();
+	}
+
+	/** Update the displayed text and resize the background to fit */
+	updateText(newText: string) {
+		if (this.textDisplay.text === newText) return;
+		this.textDisplay.text = newText;
+		this.recalcBlockHeight();
+		this.background.clear();
+		this.drawBackground(this.currentColor);
+		this.updateResizeZones();
+		this.scheduleHeightCheck();
+	}
+
+	/** Update the background color */
+	updateColor(color: number) {
+		if (this.currentColor === color) return;
+		this.background.clear();
+		this.drawBackground(color);
+	}
+
+	/** Update size from Convex sync (external data change) */
+	updateSize(width: number, height: number) {
+		const clampedW = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width));
+		if (clampedW === this.blockWidth && height === this.userHeight) return;
+		this.blockWidth = clampedW;
+		this.userHeight = height;
+		this.style.wordWrapWidth = this.blockWidth - PADDING * 2;
+		this.textDisplay.text = this.textDisplay.text; // force re-measure
+		this.recalcBlockHeight();
+		this.background.clear();
+		this.drawBackground(this.currentColor);
+		this.updateResizeZones();
+		this.scheduleHeightCheck();
+	}
+
+	/** Height = max of text content, user preference, and absolute minimum */
+	private recalcBlockHeight() {
+		const textFitHeight = this.textDisplay.height + PADDING * 2;
+		this.blockHeight = Math.max(MIN_HEIGHT, textFitHeight, this.userHeight);
+	}
+
+	/**
+	 * HTMLText measures asynchronously (offscreen SVG foreignObject).
+	 * Re-check height over several frames until the measurement settles.
+	 */
+	private scheduleHeightCheck() {
+		let remaining = 5;
+		const check = () => {
+			if (!this.container.parent) return; // destroyed
+			const textFitHeight = this.textDisplay.height + PADDING * 2;
+			const needed = Math.max(MIN_HEIGHT, textFitHeight, this.userHeight);
+			if (needed > this.blockHeight + 1) {
+				this.blockHeight = needed;
+				this.background.clear();
+				this.drawBackground(this.currentColor);
+				this.updateResizeZones();
+			}
+			remaining--;
+			if (remaining > 0) requestAnimationFrame(check);
+		};
+		requestAnimationFrame(check);
 	}
 
 	private drawBackground(color: number) {
+		this.currentColor = color;
 		this.background.roundRect(0, 0, this.blockWidth, this.blockHeight, CORNER_RADIUS);
 		this.background.fill(color);
+	}
+
+	// ── Resize zones (8 handles: 4 corners + 4 edges) ──────────────────
+
+	/** Create all 8 invisible resize zones around the note */
+	private createResizeZones() {
+		const ZONE_DEFS: Array<{ cursor: string; dirX: number; dirY: number }> = [
+			{ cursor: 'ns-resize',   dirX: 0,  dirY: -1 }, // N
+			{ cursor: 'nesw-resize', dirX: 1,  dirY: -1 }, // NE
+			{ cursor: 'ew-resize',   dirX: 1,  dirY: 0  }, // E
+			{ cursor: 'nwse-resize', dirX: 1,  dirY: 1  }, // SE
+			{ cursor: 'ns-resize',   dirX: 0,  dirY: 1  }, // S
+			{ cursor: 'nesw-resize', dirX: -1, dirY: 1  }, // SW
+			{ cursor: 'ew-resize',   dirX: -1, dirY: 0  }, // W
+			{ cursor: 'nwse-resize', dirX: -1, dirY: -1 }, // NW
+		];
+
+		for (const def of ZONE_DEFS) {
+			const g = new Graphics();
+			g.eventMode = 'static';
+			g.cursor = def.cursor;
+			this.setupResizeHandler(g, def.dirX, def.dirY);
+			this.container.addChild(g);
+			this.resizeZones.push({ graphics: g, dirX: def.dirX, dirY: def.dirY });
+		}
+
+		this.updateResizeZones();
+	}
+
+	/** Reposition and redraw all resize zone hit areas based on current dimensions */
+	private updateResizeZones() {
+		const W = this.blockWidth;
+		const H = this.blockHeight;
+		const E = EDGE_ZONE;
+		const C = CORNER_ZONE;
+
+		for (const zone of this.resizeZones) {
+			zone.graphics.clear();
+			const { dirX, dirY } = zone;
+
+			let rx: number, ry: number, rw: number, rh: number;
+
+			if (dirX === 0 && dirY === -1) {
+				// North edge
+				rx = C; ry = -E; rw = W - C * 2; rh = E * 2;
+			} else if (dirX === 1 && dirY === -1) {
+				// Northeast corner
+				rx = W - C; ry = -E; rw = C + E; rh = C + E;
+			} else if (dirX === 1 && dirY === 0) {
+				// East edge
+				rx = W - E; ry = C; rw = E * 2; rh = H - C * 2;
+			} else if (dirX === 1 && dirY === 1) {
+				// Southeast corner
+				rx = W - C; ry = H - C; rw = C + E; rh = C + E;
+			} else if (dirX === 0 && dirY === 1) {
+				// South edge
+				rx = C; ry = H - E; rw = W - C * 2; rh = E * 2;
+			} else if (dirX === -1 && dirY === 1) {
+				// Southwest corner
+				rx = -E; ry = H - C; rw = C + E; rh = C + E;
+			} else if (dirX === -1 && dirY === 0) {
+				// West edge
+				rx = -E; ry = C; rw = E * 2; rh = H - C * 2;
+			} else {
+				// Northwest corner
+				rx = -E; ry = -E; rw = C + E; rh = C + E;
+			}
+
+			// Invisible hit area
+			zone.graphics.rect(rx, ry, rw, rh);
+			zone.graphics.fill({ color: 0xffffff, alpha: 0.001 });
+
+			// Draw visual grip lines on SE corner only
+			if (dirX === 1 && dirY === 1) {
+				const gx = W - HANDLE_SIZE - 4;
+				const gy = H - HANDLE_SIZE - 4;
+				for (let i = 0; i < 3; i++) {
+					const offset = i * 4;
+					zone.graphics.moveTo(gx + HANDLE_SIZE - offset, gy + HANDLE_SIZE);
+					zone.graphics.lineTo(gx + HANDLE_SIZE, gy + HANDLE_SIZE - offset);
+					zone.graphics.stroke({ width: 1.5, color: 0x999999, alpha: 0.5 });
+				}
+			}
+		}
+	}
+
+	/**
+	 * Set up unified pointer handler for a resize zone.
+	 * dirX/dirY encode which axes and direction (see ResizeZone docs).
+	 */
+	private setupResizeHandler(handle: Graphics, dirX: number, dirY: number) {
+		let isResizing = false;
+		let startMouseX = 0;
+		let startMouseY = 0;
+		let startWidth = 0;
+		let startHeight = 0;
+		let startPosX = 0;
+		let startPosY = 0;
+
+		handle.on('pointerdown', (event: FederatedPointerEvent) => {
+			event.stopPropagation(); // Prevents note drag AND canvas pan
+			isResizing = true;
+			startMouseX = event.globalX;
+			startMouseY = event.globalY;
+			startWidth = this.blockWidth;
+			startHeight = this.blockHeight;
+			startPosX = this.container.x;
+			startPosY = this.container.y;
+		});
+
+		handle.on('globalpointermove', (event: FederatedPointerEvent) => {
+			if (!isResizing) return;
+
+			const scale = this.container.parent?.scale.x ?? 1;
+			const mouseDx = (event.globalX - startMouseX) / scale;
+			const mouseDy = (event.globalY - startMouseY) / scale;
+
+			// Calculate new size based on direction
+			let newWidth = dirX !== 0 ? startWidth + mouseDx * dirX : this.blockWidth;
+			let newHeight = dirY !== 0 ? startHeight + mouseDy * dirY : this.blockHeight;
+
+			// Clamp width
+			newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
+
+			// Clamp height
+			newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+
+			// Adjust position for left/top resize (keep opposite edge fixed)
+			if (dirX === -1) {
+				this.container.x = startPosX + (startWidth - newWidth);
+			}
+			if (dirY === -1) {
+				this.container.y = startPosY + (startHeight - newHeight);
+			}
+
+			this.applySizeInternal(newWidth, newHeight);
+		});
+
+		const endResize = () => {
+			if (!isResizing) return;
+			isResizing = false;
+			if (this.objectId && this.options.onResize) {
+				this.options.onResize(
+					this.objectId,
+					this.container.x,
+					this.container.y,
+					this.blockWidth,
+					this.blockHeight,
+				);
+			}
+		};
+
+		handle.on('pointerup', endResize);
+		handle.on('pointerupoutside', endResize);
+	}
+
+	/** Apply a new size during live resize (no Convex call, just visual) */
+	private applySizeInternal(width: number, height: number) {
+		this.blockWidth = width;
+		this.userHeight = height;
+		this.style.wordWrapWidth = this.blockWidth - PADDING * 2;
+		this.textDisplay.text = this.textDisplay.text; // force re-measure
+		this.recalcBlockHeight();
+		this.background.clear();
+		this.drawBackground(this.currentColor);
+		this.updateResizeZones();
 	}
 }

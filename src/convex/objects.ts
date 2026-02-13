@@ -9,7 +9,7 @@ import { checkCanvasAccess } from "./access";
 const CANVAS_MAX_X = 3000;
 const CANVAS_MAX_Y = 2000;
 const MAX_OBJECT_SIZE = 1000;
-const MAX_TEXT_LENGTH = 5000;
+const MAX_TEXT_LENGTH = 10000;
 const MAX_TITLE_LENGTH = 200;
 
 /** Validate position is within canvas bounds */
@@ -140,6 +140,51 @@ export const updatePosition = mutation({
 		await checkCanvasAccess(ctx, obj.canvasId, user.uuid, "member");
 
 		await ctx.db.patch(args.id, { position: args.position });
+	},
+});
+
+/** Update a textblock's content (caller must have member+ access) */
+export const updateContent = mutation({
+	args: {
+		id: v.id("canvasObjects"),
+		content: textblockContent,
+	},
+	handler: async (ctx, args) => {
+		const user = await getAuthenticatedUser(ctx);
+
+		const obj = await ctx.db.get(args.id);
+		if (!obj) throw new Error("Object not found");
+		if (obj.type !== "textblock") throw new Error("Can only update textblock content");
+
+		await checkCanvasAccess(ctx, obj.canvasId, user.uuid, "member");
+
+		if (!args.content.text || args.content.text.length < 1 || args.content.text.length > MAX_TEXT_LENGTH) {
+			throw new Error(`Text must be 1–${MAX_TEXT_LENGTH} characters`);
+		}
+
+		await ctx.db.patch(args.id, { content: args.content });
+	},
+});
+
+/** Update an object's size (caller must have member+ access) */
+export const updateSize = mutation({
+	args: {
+		id: v.id("canvasObjects"),
+		size: v.object({ w: v.number(), h: v.number() }),
+	},
+	handler: async (ctx, args) => {
+		const user = await getAuthenticatedUser(ctx);
+
+		const obj = await ctx.db.get(args.id);
+		if (!obj) throw new Error("Object not found");
+
+		await checkCanvasAccess(ctx, obj.canvasId, user.uuid, "member");
+
+		if (args.size.w <= 0 || args.size.w > MAX_OBJECT_SIZE || args.size.h <= 0 || args.size.h > MAX_OBJECT_SIZE) {
+			throw new Error(`Object size must be between 1 and ${MAX_OBJECT_SIZE}`);
+		}
+
+		await ctx.db.patch(args.id, { size: args.size });
 	},
 });
 

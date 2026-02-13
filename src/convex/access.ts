@@ -176,48 +176,51 @@ export const getAccessibleCanvases = query({
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return [];
 
-		// Personal canvases (owned)
-		const ownedCanvases = await ctx.db
-			.query("canvases")
-			.withIndex("by_owner", (q) => q.eq("ownerId", user.uuid))
-			.collect();
+		// Run all independent queries in parallel
+		const [ownedCanvases, accessRecords, asRequester, asReceiver] = await Promise.all([
+			// Personal canvases (owned)
+			ctx.db
+				.query("canvases")
+				.withIndex("by_owner", (q) => q.eq("ownerId", user.uuid))
+				.collect(),
+			// Shared canvases (via canvasAccess)
+			ctx.db
+				.query("canvasAccess")
+				.withIndex("by_user", (q) => q.eq("userId", user.uuid))
+				.collect(),
+			// Friendships — compound index eliminates post-filter
+			ctx.db
+				.query("friendships")
+				.withIndex("by_requester_status", (q) =>
+					q.eq("requesterId", user.uuid).eq("status", "accepted")
+				)
+				.collect(),
+			ctx.db
+				.query("friendships")
+				.withIndex("by_receiver_status", (q) =>
+					q.eq("receiverId", user.uuid).eq("status", "accepted")
+				)
+				.collect(),
+		]);
 
-		// Shared canvases (via canvasAccess)
-		const accessRecords = await ctx.db
-			.query("canvasAccess")
-			.withIndex("by_user", (q) => q.eq("userId", user.uuid))
-			.collect();
-
-		const sharedCanvases = await Promise.all(
-			accessRecords.map((record) => ctx.db.get(record.canvasId))
-		);
-
-		// Friends' personal canvases
-		const asRequester = await ctx.db
-			.query("friendships")
-			.withIndex("by_requester", (q) => q.eq("requesterId", user.uuid))
-			.filter((q) => q.eq(q.field("status"), "accepted"))
-			.collect();
-		const asReceiver = await ctx.db
-			.query("friendships")
-			.withIndex("by_receiver", (q) => q.eq("receiverId", user.uuid))
-			.filter((q) => q.eq(q.field("status"), "accepted"))
-			.collect();
-
+		// Resolve shared canvases + friend canvases in a single parallel batch
 		const friendUuids = [
 			...asRequester.map((f) => f.receiverId),
 			...asReceiver.map((f) => f.requesterId),
 		];
 
-		const friendCanvases = await Promise.all(
-			friendUuids.map((uuid) =>
+		const [sharedCanvases, ...friendCanvases] = await Promise.all([
+			// Batch-fetch all shared canvases at once
+			Promise.all(accessRecords.map((record) => ctx.db.get(record.canvasId))),
+			// Fetch each friend's personal canvas
+			...friendUuids.map((uuid) =>
 				ctx.db
 					.query("canvases")
 					.withIndex("by_owner", (q) => q.eq("ownerId", uuid))
 					.filter((q) => q.eq(q.field("type"), "personal"))
 					.first()
-			)
-		);
+			),
+		]);
 
 		return [
 			...ownedCanvases.map((c) => ({ ...c, role: "owner" as const })),
