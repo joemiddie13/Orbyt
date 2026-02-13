@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
+import { checkCanvasAccess } from "./access";
 
 const VALID_STICKER_TYPES = ['heart', 'fire', 'laugh', 'wave', 'star', '100', 'thumbs-up', 'eyes'];
 
@@ -18,9 +19,10 @@ export const addSticker = mutation({
 			throw new Error("Invalid sticker type");
 		}
 
-		// Verify the object exists
+		// Verify the object exists and caller has canvas access
 		const obj = await ctx.db.get(args.objectId);
 		if (!obj) throw new Error("Object not found");
+		await checkCanvasAccess(ctx, obj.canvasId, user.uuid, "viewer");
 
 		return ctx.db.insert("stickerReactions", {
 			objectId: args.objectId,
@@ -52,6 +54,12 @@ export const getByCanvas = query({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return [];
+
+		try {
+			await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
+		} catch {
+			return [];
+		}
 
 		// Get all objects on this canvas
 		const objects = await ctx.db

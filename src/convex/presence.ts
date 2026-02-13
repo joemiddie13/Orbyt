@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
+import { checkCanvasAccess } from "./access";
 
 /**
  * Canvas presence — tracks who's currently viewing each canvas.
@@ -12,6 +13,7 @@ export const joinCanvas = mutation({
 	args: { canvasId: v.id("canvases") },
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx);
+		await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
 
 		const existing = await ctx.db
 			.query("canvasPresence")
@@ -41,6 +43,12 @@ export const heartbeat = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return;
+
+		try {
+			await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
+		} catch {
+			return;
+		}
 
 		const existing = await ctx.db
 			.query("canvasPresence")
@@ -89,6 +97,12 @@ export const getViewers = query({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return [];
+
+		try {
+			await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
+		} catch {
+			return [];
+		}
 
 		const cutoff = Date.now() - 60 * 1000; // 60s stale threshold
 

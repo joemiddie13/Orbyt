@@ -3,6 +3,37 @@ import { mutation, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
 import { areFriends } from "./friendships";
 
+/** Check if a user has access to a canvas (owner, member, viewer, or friend) */
+export async function checkCanvasAccess(ctx: any, canvasId: any, userUuid: string, minRole: "viewer" | "member" | "owner" = "viewer") {
+	const canvas = await ctx.db.get(canvasId);
+	if (!canvas) throw new Error("Canvas not found");
+
+	// Owner always has full access
+	if (canvas.ownerId === userUuid) return { canvas, role: "owner" as const };
+
+	// Check canvasAccess table for explicitly shared canvases
+	const access = await ctx.db
+		.query("canvasAccess")
+		.withIndex("by_canvas_user", (q: any) => q.eq("canvasId", canvasId).eq("userId", userUuid))
+		.first();
+
+	if (access) {
+		const roleHierarchy: Record<string, number> = { viewer: 0, member: 1, owner: 2 };
+		if ((roleHierarchy[access.role] ?? 0) < (roleHierarchy[minRole] ?? 0)) {
+			throw new Error(`Requires ${minRole} access`);
+		}
+		return { canvas, role: access.role };
+	}
+
+	// Friends get viewer access to personal canvases
+	if (canvas.type === "personal" && minRole === "viewer") {
+		const friends = await areFriends(ctx, userUuid, canvas.ownerId);
+		if (friends) return { canvas, role: "viewer" as const };
+	}
+
+	throw new Error("Not authorized to access this canvas");
+}
+
 /** Grant a user access to a canvas */
 export const grantAccess = mutation({
 	args: {
@@ -87,6 +118,13 @@ export const getCanvasMembers = query({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return [];
+
+		// Verify caller has access to this canvas
+		try {
+			await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
+		} catch {
+			return [];
+		}
 
 		const accessRecords = await ctx.db
 			.query("canvasAccess")

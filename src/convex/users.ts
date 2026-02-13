@@ -118,16 +118,24 @@ export const ensureFriendCode = mutation({
 	},
 });
 
-/** Look up an Astrophage user by UUID (auth-protected — profiles are private) */
+/** Look up an Astrophage user by UUID (auth-protected — returns public fields only) */
 export const getByUuid = query({
 	args: { uuid: v.string() },
 	handler: async (ctx, args) => {
 		const authUser = await authComponent.getAuthUser(ctx).catch(() => null);
 		if (!authUser) return null;
 
-		return ctx.db
+		const user = await ctx.db
 			.query("users")
 			.withIndex("by_uuid", (q) => q.eq("uuid", args.uuid))
 			.first();
+		if (!user) return null;
+
+		// Only expose public fields — strip friendCode, authAccountId, _id
+		return {
+			uuid: user.uuid,
+			username: user.username,
+			displayName: user.displayName,
+		};
 	},
 });

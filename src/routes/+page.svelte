@@ -329,7 +329,6 @@
 
 		await client.mutation(api.objects.create, {
 			canvasId: activeCanvasId as any,
-			creatorId: currentUser.user.uuid,
 			type: 'textblock',
 			position: { x: center.x - 120, y: center.y - 40 },
 			size: { w: 240, h: 80 },

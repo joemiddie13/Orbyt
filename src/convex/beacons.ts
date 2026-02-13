@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
+import { checkCanvasAccess } from "./access";
 
 /** Get active (non-expired) beacons on a canvas */
 export const getActiveBeacons = query({
@@ -8,6 +9,12 @@ export const getActiveBeacons = query({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return [];
+
+		try {
+			await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
+		} catch {
+			return [];
+		}
 
 		const objects = await ctx.db
 			.query("canvasObjects")
@@ -26,7 +33,8 @@ export const cleanupExpired = internalMutation({
 	handler: async (ctx) => {
 		const now = Date.now();
 
-		// Find all expired beacon objects
+		// Full table scan — acceptable for cron job with small table.
+		// If canvasObjects grows large, add an expiresAt index.
 		const allObjects = await ctx.db.query("canvasObjects").collect();
 		const expiredBeacons = allObjects.filter(
 			(obj) => obj.type === "beacon" && obj.expiresAt && obj.expiresAt < now

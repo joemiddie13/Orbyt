@@ -66,7 +66,6 @@
 		try {
 			await client.mutation(api.objects.create, {
 				canvasId: canvasId as any,
-				creatorId: userUuid,
 				type: 'beacon',
 				position: { x: 400 + Math.random() * 600, y: 300 + Math.random() * 400 },
 				size: { w: 260, h: 100 },

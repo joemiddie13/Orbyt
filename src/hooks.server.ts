@@ -27,6 +27,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 			headers: new Headers(response.headers),
 		});
 		newResponse.headers.set("Content-Security-Policy", csp);
+		newResponse.headers.set("X-Frame-Options", "DENY");
+		newResponse.headers.set("X-Content-Type-Options", "nosniff");
+		newResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+		newResponse.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 		return newResponse;
 	}
 

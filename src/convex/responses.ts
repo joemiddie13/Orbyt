@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
+import { checkCanvasAccess } from "./access";
 
 /** Respond to a beacon (upsert — replaces existing response) */
 export const respond = mutation({
@@ -16,6 +17,9 @@ export const respond = mutation({
 		if (!beacon || beacon.type !== "beacon") {
 			throw new Error("Beacon not found");
 		}
+
+		// Verify caller has access to the beacon's canvas
+		await checkCanvasAccess(ctx, beacon.canvasId, user.uuid, "viewer");
 
 		// Check for existing response (upsert)
 		const existing = await ctx.db
@@ -64,6 +68,15 @@ export const getByBeacon = query({
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return [];
 
+		// Verify caller has access to the beacon's canvas
+		const beacon = await ctx.db.get(args.beaconId);
+		if (!beacon) return [];
+		try {
+			await checkCanvasAccess(ctx, beacon.canvasId, user.uuid, "viewer");
+		} catch {
+			return [];
+		}
+
 		const responses = await ctx.db
 			.query("beaconResponses")
 			.withIndex("by_beacon", (q) => q.eq("beaconId", args.beaconId))
@@ -94,14 +107,27 @@ export const getByBeaconGroup = query({
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return [];
 
-		// Find all beacon objects sharing this group ID
-		// We need to scan canvasObjects for matching directBeaconGroupId
+		// Full table scan to find beacons by directBeaconGroupId — acceptable for
+		// small table. If canvasObjects grows large, consider a dedicated index or table.
 		const allObjects = await ctx.db.query("canvasObjects").collect();
 		const groupBeacons = allObjects.filter((obj) => {
 			if (obj.type !== "beacon") return false;
 			const content = obj.content as any;
 			return content.directBeaconGroupId === args.directBeaconGroupId;
 		});
+
+		// Verify caller has access to at least one of the beacons' canvases
+		let hasAccess = false;
+		for (const beacon of groupBeacons) {
+			try {
+				await checkCanvasAccess(ctx, beacon.canvasId, user.uuid, "viewer");
+				hasAccess = true;
+				break;
+			} catch {
+				// Try next beacon
+			}
+		}
+		if (!hasAccess) return [];
 
 		const beaconIds = groupBeacons.map((b) => b._id);
 

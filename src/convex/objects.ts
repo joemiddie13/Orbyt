@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { authComponent } from "./auth";
 import { getAuthenticatedUser } from "./users";
 import { areFriends } from "./friendships";
+import { checkCanvasAccess } from "./access";
 
 /** Canvas bounds — objects must stay within these limits */
 const CANVAS_MAX_X = 3000;
@@ -16,37 +17,6 @@ function validatePosition(position: { x: number; y: number }) {
 	if (position.x < 0 || position.x > CANVAS_MAX_X || position.y < 0 || position.y > CANVAS_MAX_Y) {
 		throw new Error(`Position must be within canvas bounds (0–${CANVAS_MAX_X}, 0–${CANVAS_MAX_Y})`);
 	}
-}
-
-/** Check if a user has access to a canvas (owner, member, viewer, or friend) */
-async function checkCanvasAccess(ctx: any, canvasId: any, userUuid: string, minRole: "viewer" | "member" | "owner" = "viewer") {
-	const canvas = await ctx.db.get(canvasId);
-	if (!canvas) throw new Error("Canvas not found");
-
-	// Owner always has full access
-	if (canvas.ownerId === userUuid) return { canvas, role: "owner" as const };
-
-	// Check canvasAccess table for explicitly shared canvases
-	const access = await ctx.db
-		.query("canvasAccess")
-		.withIndex("by_canvas_user", (q: any) => q.eq("canvasId", canvasId).eq("userId", userUuid))
-		.first();
-
-	if (access) {
-		const roleHierarchy: Record<string, number> = { viewer: 0, member: 1, owner: 2 };
-		if ((roleHierarchy[access.role] ?? 0) < (roleHierarchy[minRole] ?? 0)) {
-			throw new Error(`Requires ${minRole} access`);
-		}
-		return { canvas, role: access.role };
-	}
-
-	// Friends get viewer access to personal canvases
-	if (canvas.type === "personal" && minRole === "viewer") {
-		const friends = await areFriends(ctx, userUuid, canvas.ownerId);
-		if (friends) return { canvas, role: "viewer" as const };
-	}
-
-	throw new Error("Not authorized to access this canvas");
 }
 
 /** Content validator for textblock type */
@@ -108,7 +78,6 @@ export const getByCanvas = query({
 export const create = mutation({
 	args: {
 		canvasId: v.id("canvases"),
-		creatorId: v.string(),
 		type: v.union(v.literal("textblock"), v.literal("beacon")),
 		position: v.object({ x: v.number(), y: v.number() }),
 		size: v.object({ w: v.number(), h: v.number() }),

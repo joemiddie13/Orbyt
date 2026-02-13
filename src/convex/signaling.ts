@@ -1,32 +1,14 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
-import { areFriends } from "./friendships";
+import { checkCanvasAccess } from "./access";
 
 /**
  * WebRTC signaling via Convex — relays SDP offers/answers and ICE candidates
  * between peers. Access-controlled: both users must have canvas access.
  */
 
-/** Check if a user can access a canvas (owner, canvasAccess, or friend for personal canvases) */
-async function hasCanvasAccess(ctx: any, canvasId: any, canvas: any, userUuid: string): Promise<boolean> {
-	if (canvas.ownerId === userUuid) return true;
-
-	const access = await ctx.db
-		.query("canvasAccess")
-		.withIndex("by_canvas_user", (q: any) =>
-			q.eq("canvasId", canvasId).eq("userId", userUuid),
-		)
-		.first();
-	if (access) return true;
-
-	// Friends can view personal canvases
-	if (canvas.type === "personal") {
-		return areFriends(ctx, userUuid, canvas.ownerId);
-	}
-
-	return false;
-}
+const MAX_SIGNAL_PAYLOAD = 10_000; // SDP offers ~2-4KB, ICE candidates ~200B
 
 /** Send a signaling message (offer, answer, or ICE candidate) */
 export const sendSignal = mutation({
@@ -43,15 +25,17 @@ export const sendSignal = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx);
 
-		const canvas = await ctx.db.get(args.canvasId);
-		if (!canvas) throw new Error("Canvas not found");
+		if (args.payload.length > MAX_SIGNAL_PAYLOAD) {
+			throw new Error("Signal payload too large");
+		}
 
 		// Both sender and recipient must have canvas access
-		const senderOk = await hasCanvasAccess(ctx, args.canvasId, canvas, user.uuid);
-		if (!senderOk) throw new Error("No canvas access");
-
-		const recipientOk = await hasCanvasAccess(ctx, args.canvasId, canvas, args.toUserId);
-		if (!recipientOk) throw new Error("Recipient has no canvas access");
+		await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
+		try {
+			await checkCanvasAccess(ctx, args.canvasId, args.toUserId, "viewer");
+		} catch {
+			throw new Error("Recipient has no canvas access");
+		}
 
 		await ctx.db.insert("signalingMessages", {
 			canvasId: args.canvasId,
