@@ -53,8 +53,16 @@ export class CanvasRenderer {
 	/** Map from sticker _id → StickerReaction */
 	private stickers = new Map<string, StickerReaction>();
 
-	/** Remote cursor visuals: userId → { container, lastUpdate } */
-	private remoteCursors = new Map<string, { container: Container; lastUpdate: number }>();
+	/** Remote cursor visuals with interpolation targets */
+	private remoteCursors = new Map<string, {
+		container: Container;
+		lastUpdate: number;
+		targetX: number;
+		targetY: number;
+	}>();
+
+	/** Remote object drag interpolation targets: objectId → { x, y } */
+	private remoteObjectTargets = new Map<string, { x: number; y: number }>();
 
 	/** Callback for when an object is dragged to a new position */
 	onObjectMoved?: (objectId: string, x: number, y: number) => void;
@@ -67,6 +75,9 @@ export class CanvasRenderer {
 
 	/** Callback for long-press on any object (sticker picker) */
 	onObjectLongPress?: (objectId: string, screenX: number, screenY: number) => void;
+
+	/** Whether the current user can edit objects on this canvas */
+	editable = true;
 
 	constructor() {
 		this.app = new Application();
@@ -89,9 +100,10 @@ export class CanvasRenderer {
 		this.drawBounds();
 		this.panZoom = new PanZoom(this.app, this.world, this.canvasWidth, this.canvasHeight);
 
-		// Integrate tween.js into the PixiJS render loop + cursor staleness check
+		// Integrate tween.js into the PixiJS render loop + interpolation + cursor staleness
 		this.app.ticker.add(() => {
 			TWEEN.update();
+			this.interpolateRemotes();
 			this.updateCursorStaleness();
 		});
 	}
@@ -132,6 +144,7 @@ export class CanvasRenderer {
 				const text = obj.content?.text ?? '';
 				const block = new TextBlock(text, obj.position.x, obj.position.y, color, {
 					objectId: obj._id,
+					editable: this.editable,
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
 					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
 					onLongPress: (id, sx, sy) => this.onObjectLongPress?.(id, sx, sy),
@@ -143,6 +156,7 @@ export class CanvasRenderer {
 				const isExpired = obj.expiresAt ? obj.expiresAt < Date.now() : false;
 				const beacon = new BeaconObject(content, obj.position.x, obj.position.y, {
 					objectId: obj._id,
+					editable: this.editable,
 					isExpired,
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
 					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
@@ -215,13 +229,16 @@ export class CanvasRenderer {
 
 		if (!entry) {
 			const container = this.createCursorVisual(userId, username);
+			container.x = worldX;
+			container.y = worldY;
 			this.world.addChild(container);
-			entry = { container, lastUpdate: Date.now() };
+			entry = { container, lastUpdate: Date.now(), targetX: worldX, targetY: worldY };
 			this.remoteCursors.set(userId, entry);
 		}
 
-		entry.container.x = worldX;
-		entry.container.y = worldY;
+		// Set interpolation target — ticker will lerp toward it
+		entry.targetX = worldX;
+		entry.targetY = worldY;
 		entry.container.alpha = 1;
 		entry.container.visible = true;
 		entry.lastUpdate = Date.now();
@@ -247,10 +264,14 @@ export class CanvasRenderer {
 	/** Move an object's visual via WebRTC (no Convex, just preview) */
 	moveObjectRemotely(objectId: string, x: number, y: number) {
 		const obj = this.objects.get(objectId);
-		if (obj) {
-			obj.container.x = x;
-			obj.container.y = y;
-		}
+		if (!obj) return;
+		// Set interpolation target — ticker will lerp toward it
+		this.remoteObjectTargets.set(objectId, { x, y });
+	}
+
+	/** Stop interpolating an object (drag ended, Convex will set final position) */
+	stopRemoteObjectInterpolation(objectId: string) {
+		this.remoteObjectTargets.delete(objectId);
 	}
 
 	private createCursorVisual(userId: string, username: string): Container {
@@ -288,6 +309,43 @@ export class CanvasRenderer {
 		container.addChild(label);
 
 		return container;
+	}
+
+	/** Lerp cursors and dragged objects toward their targets each frame */
+	private interpolateRemotes() {
+		const LERP = 0.3; // 0 = no movement, 1 = snap. 0.3 = smooth catch-up
+
+		// Interpolate remote cursors
+		for (const entry of this.remoteCursors.values()) {
+			const dx = entry.targetX - entry.container.x;
+			const dy = entry.targetY - entry.container.y;
+			// Snap if close enough to avoid endless micro-lerps
+			if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+				entry.container.x = entry.targetX;
+				entry.container.y = entry.targetY;
+			} else {
+				entry.container.x += dx * LERP;
+				entry.container.y += dy * LERP;
+			}
+		}
+
+		// Interpolate remotely-dragged objects
+		for (const [objectId, target] of this.remoteObjectTargets) {
+			const obj = this.objects.get(objectId);
+			if (!obj) {
+				this.remoteObjectTargets.delete(objectId);
+				continue;
+			}
+			const dx = target.x - obj.container.x;
+			const dy = target.y - obj.container.y;
+			if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+				obj.container.x = target.x;
+				obj.container.y = target.y;
+			} else {
+				obj.container.x += dx * LERP;
+				obj.container.y += dy * LERP;
+			}
+		}
 	}
 
 	/** Fade/hide stale cursors in the render loop */

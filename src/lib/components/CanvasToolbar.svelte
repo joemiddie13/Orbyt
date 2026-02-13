@@ -4,6 +4,7 @@
 	let {
 		username,
 		canvasName,
+		isOwner = true,
 		onAddNote,
 		onCreateBeacon,
 		onFriends,
@@ -13,6 +14,7 @@
 	}: {
 		username: string;
 		canvasName?: string;
+		isOwner?: boolean;
 		onAddNote: () => void;
 		onCreateBeacon: () => void;
 		onFriends: () => void;
@@ -55,19 +57,21 @@
 
 	<div class="w-px h-5 bg-stone-200"></div>
 
-	<button
-		onclick={onAddNote}
-		class="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 active:bg-amber-700 transition cursor-pointer"
-	>
-		+ Note
-	</button>
+	{#if isOwner}
+		<button
+			onclick={onAddNote}
+			class="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 active:bg-amber-700 transition cursor-pointer"
+		>
+			+ Note
+		</button>
 
-	<button
-		onclick={onCreateBeacon}
-		class="px-3 py-1.5 rounded-xl bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 active:bg-orange-700 transition cursor-pointer"
-	>
-		+ Beacon
-	</button>
+		<button
+			onclick={onCreateBeacon}
+			class="px-3 py-1.5 rounded-xl bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 active:bg-orange-700 transition cursor-pointer"
+		>
+			+ Beacon
+		</button>
+	{/if}
 
 	<div class="w-px h-5 bg-stone-200"></div>
 

@@ -31,6 +31,8 @@ export interface BeaconContent {
 
 export interface BeaconObjectOptions {
 	objectId?: string;
+	/** Whether the current user can drag this object (default: true) */
+	editable?: boolean;
 	onDragEnd?: (objectId: string, x: number, y: number) => void;
 	onDragMove?: (objectId: string, x: number, y: number) => void;
 	onTap?: (objectId: string) => void;
@@ -56,7 +58,7 @@ export class BeaconObject {
 		this.container.x = x;
 		this.container.y = y;
 		this.container.eventMode = 'static';
-		this.container.cursor = 'pointer';
+		this.container.cursor = (options.editable !== false) ? 'pointer' : 'default';
 
 		// Glow ring (pulse animation target)
 		this.glowRing = new Graphics();
@@ -156,26 +158,28 @@ export class BeaconObject {
 			this.container.addChild(expText);
 		}
 
-		// Make draggable with long-press support
-		makeDraggable(this.container, {
-			onDragEnd: (finalX, finalY) => {
-				if (this.objectId && options.onDragEnd) {
-					options.onDragEnd(this.objectId, finalX, finalY);
-				}
-			},
-			onDragMove: (x, y) => {
-				if (this.objectId && options.onDragMove) {
-					options.onDragMove(this.objectId, x, y);
-				}
-			},
-			onLongPress: (screenX, screenY) => {
-				if (this.objectId && options.onLongPress) {
-					options.onLongPress(this.objectId, screenX, screenY);
-				}
-			},
-		});
+		// Only make draggable if the user owns this canvas
+		if (options.editable !== false) {
+			makeDraggable(this.container, {
+				onDragEnd: (finalX, finalY) => {
+					if (this.objectId && options.onDragEnd) {
+						options.onDragEnd(this.objectId, finalX, finalY);
+					}
+				},
+				onDragMove: (x, y) => {
+					if (this.objectId && options.onDragMove) {
+						options.onDragMove(this.objectId, x, y);
+					}
+				},
+				onLongPress: (screenX, screenY) => {
+					if (this.objectId && options.onLongPress) {
+						options.onLongPress(this.objectId, screenX, screenY);
+					}
+				},
+			});
+		}
 
-		// Tap handler (pointerdown without move = tap)
+		// Tap handler for viewing beacon details (works for all users)
 		if (options.onTap) {
 			let didMove = false;
 			this.container.on('pointerdown', () => { didMove = false; });

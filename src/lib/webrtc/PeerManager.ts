@@ -9,8 +9,8 @@ import type { DataChannelMessage, PeerManagerCallbacks } from './types';
  * Throttled sends keep bandwidth reasonable.
  */
 
-const CURSOR_THROTTLE = 100; // 10Hz
-const DRAG_THROTTLE = 66; // ~15Hz
+const CURSOR_THROTTLE = 50; // 20Hz — smooth cursor movement
+const DRAG_THROTTLE = 40; // 25Hz — smooth drag streaming
 
 export class PeerManager {
 	private peers = new Map<string, PeerConnection>();

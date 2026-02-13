@@ -20,6 +20,8 @@ const DEFAULT_WIDTH = 240;
 export interface TextBlockOptions {
 	/** Convex document _id — links this visual to the database record */
 	objectId?: string;
+	/** Whether the current user can drag this object (default: true) */
+	editable?: boolean;
 	/** Called when the user finishes dragging this block */
 	onDragEnd?: (objectId: string, x: number, y: number) => void;
 	/** Called continuously during drag with intermediate positions */
@@ -45,9 +47,9 @@ export class TextBlock {
 		this.container.x = x;
 		this.container.y = y;
 
-		// Make this container interactive (needed for drag-and-drop)
+		// Make this container interactive
 		this.container.eventMode = 'static';
-		this.container.cursor = 'grab';
+		this.container.cursor = (options.editable !== false) ? 'grab' : 'default';
 
 		// Create the text first so we can measure it and size the background
 		const style = new TextStyle({
@@ -75,24 +77,26 @@ export class TextBlock {
 		this.container.addChild(this.background);
 		this.container.addChild(this.textDisplay);
 
-		// Make this block draggable, with persistence and long-press callbacks
-		makeDraggable(this.container, {
-			onDragEnd: (finalX, finalY) => {
-				if (this.objectId && options.onDragEnd) {
-					options.onDragEnd(this.objectId, finalX, finalY);
-				}
-			},
-			onDragMove: (x, y) => {
-				if (this.objectId && options.onDragMove) {
-					options.onDragMove(this.objectId, x, y);
-				}
-			},
-			onLongPress: (screenX, screenY) => {
-				if (this.objectId && options.onLongPress) {
-					options.onLongPress(this.objectId, screenX, screenY);
-				}
-			},
-		});
+		// Only make draggable if the user owns this canvas
+		if (options.editable !== false) {
+			makeDraggable(this.container, {
+				onDragEnd: (finalX, finalY) => {
+					if (this.objectId && options.onDragEnd) {
+						options.onDragEnd(this.objectId, finalX, finalY);
+					}
+				},
+				onDragMove: (x, y) => {
+					if (this.objectId && options.onDragMove) {
+						options.onDragMove(this.objectId, x, y);
+					}
+				},
+				onLongPress: (screenX, screenY) => {
+					if (this.objectId && options.onLongPress) {
+						options.onLongPress(this.objectId, screenX, screenY);
+					}
+				},
+			});
+		}
 	}
 
 	private drawBackground(color: number) {

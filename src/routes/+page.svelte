@@ -35,6 +35,13 @@
 	let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 	let webrtcConnected = $state(false);
 
+	// Derive whether the current user owns the active canvas
+	let isCanvasOwner = $derived.by(() => {
+		if (!activeCanvasId || !accessibleCanvases.data) return false;
+		const canvas = accessibleCanvases.data.find((c: any) => c._id === activeCanvasId);
+		return canvas?.role === 'owner';
+	});
+
 	// Modal state
 	let showFriendCode = $state(false);
 	let showFriendsList = $state(false);
@@ -128,7 +135,7 @@
 		// Already have a PeerManager for this user
 		if (peerManager) return;
 
-		console.log('[WebRTC] PeerManager created for', user.username);
+		// PeerManager ready
 		peerManager = new PeerManager(user.uuid, user.username, {
 			onRemoteCursor: (userId, username, x, y) => {
 				renderer?.updateRemoteCursor(userId, username, x, y);
@@ -138,13 +145,13 @@
 			},
 			onRemoteDragEnd: (_userId, objectId, x, y) => {
 				renderer?.moveObjectRemotely(objectId, x, y);
+				// Let Convex set the final position, stop interpolating
+				renderer?.stopRemoteObjectInterpolation(objectId);
 			},
 			onPeerConnected: (userId) => {
-				console.log('[WebRTC] Peer CONNECTED:', userId);
 				webrtcConnected = peerManager?.hasConnections ?? false;
 			},
 			onPeerDisconnected: (userId) => {
-				console.log('[WebRTC] Peer DISCONNECTED:', userId);
 				webrtcConnected = peerManager?.hasConnections ?? false;
 			},
 			onSignal: (toUserId, signal) => {
@@ -173,7 +180,6 @@
 		const user = currentUser.user;
 		if (!canvasId || !user?.uuid) return;
 
-		console.log('[WebRTC] Joining canvas:', canvasId);
 		// Join this canvas
 		client.mutation(api.presence.joinCanvas, { canvasId: canvasId as any }).catch(() => {});
 
@@ -204,7 +210,6 @@
 		const signals = incomingSignals.data;
 		if (!signals || signals.length === 0 || !peerManager) return;
 
-		console.log('[WebRTC] Processing', signals.length, 'signals');
 		const consumed = peerManager.processSignals(signals as any[]);
 
 		// Delete consumed signals from Convex
@@ -221,7 +226,6 @@
 		const myUuid = currentUser.user.uuid;
 		const others = viewers.filter((v: any) => v.userId !== myUuid);
 		if (others.length > 0) {
-			console.log('[WebRTC] Viewers on canvas:', others.map((v: any) => v.username));
 		}
 
 		for (const viewer of others) {
@@ -284,6 +288,21 @@
 			heartbeatInterval = null;
 		}
 		if (renderer) renderer.destroy();
+	});
+
+	// Update renderer editability when canvas ownership changes
+	$effect(() => {
+		if (renderer) {
+			const wasEditable = renderer.editable;
+			renderer.editable = isCanvasOwner;
+
+			// If editability changed, force re-sync to update drag behavior on existing objects
+			if (wasEditable !== isCanvasOwner && canvasObjects.data) {
+				// Clear existing objects so syncObjects recreates them with new editable state
+				renderer.syncObjects([]);
+				renderer.syncObjects(canvasObjects.data as CanvasObjectData[]);
+			}
+		}
 	});
 
 	// Reactively sync canvas objects from Convex → PixiJS
@@ -358,6 +377,7 @@
 	<CanvasToolbar
 		username={currentUser.user?.displayName ?? currentUser.user?.username ?? ''}
 		canvasName={activeCanvasName}
+		isOwner={isCanvasOwner}
 		onAddNote={addNote}
 		onCreateBeacon={() => { showCreateBeacon = true; }}
 		onFriends={() => { showFriendCode = true; }}
