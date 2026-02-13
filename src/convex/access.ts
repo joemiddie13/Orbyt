@@ -50,17 +50,17 @@ export const grantAccess = mutation({
 			throw new Error("Only the canvas owner can invite people");
 		}
 
-		// Verify target is a friend
-		const forwardFriendship = await ctx.db
-			.query("friendships")
-			.withIndex("by_pair", (q) => q.eq("requesterId", user.uuid).eq("receiverId", args.targetUuid))
-			.filter((q) => q.eq(q.field("status"), "accepted"))
-			.first();
-		const reverseFriendship = await ctx.db
-			.query("friendships")
-			.withIndex("by_pair", (q) => q.eq("requesterId", args.targetUuid).eq("receiverId", user.uuid))
-			.filter((q) => q.eq(q.field("status"), "accepted"))
-			.first();
+		// Verify target is a friend (parallel lookup)
+		const [forwardFriendship, reverseFriendship] = await Promise.all([
+			ctx.db.query("friendships")
+				.withIndex("by_pair", (q) => q.eq("requesterId", user.uuid).eq("receiverId", args.targetUuid))
+				.filter((q) => q.eq(q.field("status"), "accepted"))
+				.first(),
+			ctx.db.query("friendships")
+				.withIndex("by_pair", (q) => q.eq("requesterId", args.targetUuid).eq("receiverId", user.uuid))
+				.filter((q) => q.eq(q.field("status"), "accepted"))
+				.first(),
+		]);
 
 		if (!forwardFriendship && !reverseFriendship) {
 			throw new Error("Can only invite connected friends");

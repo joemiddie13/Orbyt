@@ -7,6 +7,7 @@
 		isOwner = true,
 		onAddNote,
 		onCreateBeacon,
+		onAddPhoto,
 		onFriends,
 		onFriendsList,
 		onCanvasSwitcher,
@@ -17,6 +18,7 @@
 		isOwner?: boolean;
 		onAddNote: () => void;
 		onCreateBeacon: () => void;
+		onAddPhoto: () => void;
 		onFriends: () => void;
 		onFriendsList: () => void;
 		onCanvasSwitcher: () => void;
@@ -70,6 +72,13 @@
 			class="px-3 py-1.5 rounded-xl bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 active:bg-orange-700 transition cursor-pointer"
 		>
 			+ Beacon
+		</button>
+
+		<button
+			onclick={onAddPhoto}
+			class="px-3 py-1.5 rounded-xl bg-violet-500 text-white text-sm font-medium hover:bg-violet-600 active:bg-violet-700 transition cursor-pointer"
+		>
+			+ Photo
 		</button>
 	{/if}
 

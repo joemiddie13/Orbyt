@@ -4,6 +4,7 @@ import { PanZoom } from './interactions/PanZoom';
 import { TextBlock } from './objects/TextBlock';
 import { BeaconObject, type BeaconContent } from './objects/BeaconObject';
 import { StickerReaction, type StickerData } from './objects/StickerReaction';
+import { PhotoObject, type PhotoContent } from './objects/PhotoObject';
 
 /**
  * CanvasRenderer — the core of Astrophage.
@@ -48,7 +49,7 @@ export class CanvasRenderer {
 	private panZoom!: PanZoom;
 
 	/** Map from Convex _id → visual object for reconciliation */
-	private objects = new Map<string, TextBlock | BeaconObject>();
+	private objects = new Map<string, TextBlock | BeaconObject | PhotoObject>();
 
 	/** Map from sticker _id → StickerReaction */
 	private stickers = new Map<string, StickerReaction>();
@@ -64,6 +65,9 @@ export class CanvasRenderer {
 	/** Remote object drag interpolation targets: objectId → { x, y } */
 	private remoteObjectTargets = new Map<string, { x: number; y: number }>();
 
+	/** Cache cursor colors by userId to avoid recomputing */
+	private cursorColorCache = new Map<string, number>();
+
 	/** Callback for when an object is dragged to a new position */
 	onObjectMoved?: (objectId: string, x: number, y: number) => void;
 
@@ -75,6 +79,9 @@ export class CanvasRenderer {
 
 	/** Callback for when a note is tapped */
 	onNoteTapped?: (objectId: string) => void;
+
+	/** Callback for when a photo is tapped */
+	onPhotoTapped?: (objectId: string) => void;
 
 	/** Callback for long-press on any object (sticker picker) */
 	onObjectLongPress?: (objectId: string, screenX: number, screenY: number) => void;
@@ -118,12 +125,13 @@ export class CanvasRenderer {
 	 * Reconcile the visual objects on canvas with data from Convex.
 	 * Adds new objects, updates moved ones, removes deleted ones.
 	 */
-	syncObjects(data: CanvasObjectData[]) {
+	syncObjects(data: CanvasObjectData[], animate = true) {
 		const incomingIds = new Set(data.map((d) => d._id));
 
 		// Remove objects that no longer exist in the database
 		for (const [id, obj] of this.objects) {
 			if (!incomingIds.has(id)) {
+				if (obj instanceof BeaconObject) obj.destroy();
 				this.world.removeChild(obj.container);
 				obj.container.destroy({ children: true });
 				this.objects.delete(id);
@@ -136,8 +144,8 @@ export class CanvasRenderer {
 
 			if (existing) {
 				// Update position if it changed (e.g. from another tab)
-				existing.container.x = obj.position.x;
-				existing.container.y = obj.position.y;
+				if (existing.container.x !== obj.position.x) existing.container.x = obj.position.x;
+				if (existing.container.y !== obj.position.y) existing.container.y = obj.position.y;
 
 				// Update text content and color for notes
 				if (obj.type === 'textblock' && existing instanceof TextBlock) {
@@ -151,6 +159,12 @@ export class CanvasRenderer {
 					if (obj.expiresAt && obj.expiresAt < Date.now()) {
 						existing.setExpired();
 					}
+				}
+
+				// Update caption for photos
+				if (obj.type === 'photo' && existing instanceof PhotoObject) {
+					const content = obj.content as PhotoContent;
+					existing.updateCaption(content.caption ?? '');
 				}
 			} else if (obj.type === 'textblock') {
 				const color = obj.content?.color ?? 0xfff9c4;
@@ -174,6 +188,7 @@ export class CanvasRenderer {
 				const beacon = new BeaconObject(content, obj.position.x, obj.position.y, {
 					objectId: obj._id,
 					editable: this.editable,
+					animate,
 					isExpired,
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
 					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
@@ -182,6 +197,19 @@ export class CanvasRenderer {
 				});
 				this.world.addChild(beacon.container);
 				this.objects.set(obj._id, beacon);
+			} else if (obj.type === 'photo') {
+				const content = obj.content as PhotoContent;
+				const photo = new PhotoObject(content, obj.position.x, obj.position.y, {
+					objectId: obj._id,
+					editable: this.editable,
+					animate,
+					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
+					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
+					onTap: (id) => this.onPhotoTapped?.(id),
+					onLongPress: (id, sx, sy) => this.onObjectLongPress?.(id, sx, sy),
+				});
+				this.world.addChild(photo.container);
+				this.objects.set(obj._id, photo);
 			}
 		}
 	}
@@ -195,6 +223,7 @@ export class CanvasRenderer {
 		// Remove stickers that no longer exist
 		for (const [id, sticker] of this.stickers) {
 			if (!incomingIds.has(id)) {
+				sticker.destroy();
 				sticker.container.parent?.removeChild(sticker.container);
 				sticker.container.destroy({ children: true });
 				this.stickers.delete(id);
@@ -264,7 +293,7 @@ export class CanvasRenderer {
 	}
 
 	/** Get a canvas object by its Convex _id */
-	getObject(objectId: string): TextBlock | BeaconObject | undefined {
+	getObject(objectId: string): TextBlock | BeaconObject | PhotoObject | undefined {
 		return this.objects.get(objectId);
 	}
 
@@ -358,6 +387,7 @@ export class CanvasRenderer {
 
 	/** Lerp cursors and dragged objects toward their targets each frame */
 	private interpolateRemotes() {
+		if (this.remoteCursors.size === 0 && this.remoteObjectTargets.size === 0) return;
 		const LERP = 0.3; // 0 = no movement, 1 = snap. 0.3 = smooth catch-up
 
 		// Interpolate remote cursors
@@ -395,6 +425,7 @@ export class CanvasRenderer {
 
 	/** Fade/hide stale cursors in the render loop */
 	private updateCursorStaleness() {
+		if (this.remoteCursors.size === 0) return;
 		const now = Date.now();
 		for (const [userId, entry] of this.remoteCursors) {
 			const age = now - entry.lastUpdate;
@@ -408,13 +439,17 @@ export class CanvasRenderer {
 		}
 	}
 
-	/** Deterministic color for a userId */
+	/** Deterministic color for a userId (cached) */
 	private getCursorColor(userId: string): number {
+		let color = this.cursorColorCache.get(userId);
+		if (color !== undefined) return color;
 		let hash = 0;
 		for (let i = 0; i < userId.length; i++) {
 			hash = (hash * 31 + userId.charCodeAt(i)) | 0;
 		}
-		return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
+		color = CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
+		this.cursorColorCache.set(userId, color);
+		return color;
 	}
 
 	private drawBounds() {

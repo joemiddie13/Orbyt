@@ -52,7 +52,7 @@ export default defineSchema({
 	canvasObjects: defineTable({
 		canvasId: v.id("canvases"),
 		creatorId: v.string(), // UUID, not Convex _id
-		type: v.union(v.literal("textblock"), v.literal("beacon")),
+		type: v.union(v.literal("textblock"), v.literal("beacon"), v.literal("photo")),
 		position: v.object({
 			x: v.number(),
 			y: v.number(),
@@ -76,9 +76,16 @@ export default defineSchema({
 				directRecipients: v.optional(v.array(v.string())),
 				directBeaconGroupId: v.optional(v.string()),
 			}),
+			v.object({
+				storageId: v.string(),
+				caption: v.optional(v.string()),
+				rotation: v.number(),
+			}),
 		),
 		expiresAt: v.optional(v.number()),
-	}).index("by_canvas", ["canvasId"]),
+	})
+		.index("by_canvas", ["canvasId"])
+		.index("by_type_expires", ["type", "expiresAt"]),
 
 	beaconResponses: defineTable({
 		beaconId: v.id("canvasObjects"),
@@ -120,5 +127,6 @@ export default defineSchema({
 		lastSeen: v.number(),
 	})
 		.index("by_canvas", ["canvasId"])
-		.index("by_canvas_user", ["canvasId", "userId"]),
+		.index("by_canvas_user", ["canvasId", "userId"])
+		.index("by_last_seen", ["lastSeen"]),
 });

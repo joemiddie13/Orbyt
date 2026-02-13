@@ -206,15 +206,18 @@ export class TextBlock {
 	updateSize(width: number, height: number) {
 		const clampedW = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width));
 		if (clampedW === this.blockWidth && height === this.userHeight) return;
+		const widthChanged = clampedW !== this.blockWidth;
 		this.blockWidth = clampedW;
 		this.userHeight = height;
-		this.style.wordWrapWidth = this.blockWidth - PADDING * 2;
-		this.textDisplay.text = this.textDisplay.text; // force re-measure
+		if (widthChanged) {
+			this.style.wordWrapWidth = this.blockWidth - PADDING * 2;
+			this.textDisplay.text = this.textDisplay.text; // force re-measure only when width changed
+		}
 		this.recalcBlockHeight();
 		this.background.clear();
 		this.drawBackground(this.currentColor);
 		this.updateResizeZones();
-		this.scheduleHeightCheck();
+		if (widthChanged) this.scheduleHeightCheck();
 	}
 
 	/** Height = max of text content, user preference, and absolute minimum */
@@ -229,6 +232,7 @@ export class TextBlock {
 	 */
 	private scheduleHeightCheck() {
 		let remaining = 5;
+		let lastHeight = -1;
 		const check = () => {
 			if (!this.container.parent) return; // destroyed
 			const textFitHeight = this.textDisplay.height + PADDING * 2;
@@ -240,6 +244,9 @@ export class TextBlock {
 				this.updateResizeZones();
 			}
 			remaining--;
+			// Exit early if height stabilized (same as last frame)
+			if (needed === lastHeight) return;
+			lastHeight = needed;
 			if (remaining > 0) requestAnimationFrame(check);
 		};
 		requestAnimationFrame(check);
@@ -407,10 +414,13 @@ export class TextBlock {
 
 	/** Apply a new size during live resize (no Convex call, just visual) */
 	private applySizeInternal(width: number, height: number) {
+		const widthChanged = width !== this.blockWidth;
 		this.blockWidth = width;
 		this.userHeight = height;
-		this.style.wordWrapWidth = this.blockWidth - PADDING * 2;
-		this.textDisplay.text = this.textDisplay.text; // force re-measure
+		if (widthChanged) {
+			this.style.wordWrapWidth = this.blockWidth - PADDING * 2;
+			this.textDisplay.text = this.textDisplay.text; // force re-measure only when width changed
+		}
 		this.recalcBlockHeight();
 		this.background.clear();
 		this.drawBackground(this.currentColor);

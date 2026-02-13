@@ -36,6 +36,7 @@ export interface StickerData {
 export class StickerReaction {
 	container: Container;
 	stickerId: string;
+	private popInTween: TWEEN.Tween<{ s: number }> | null = null;
 
 	constructor(data: StickerData, animate = true) {
 		this.stickerId = data._id;
@@ -54,14 +55,23 @@ export class StickerReaction {
 		// Pop-in animation — must TWEEN.add() in v25 (tweens aren't auto-added to default group)
 		if (animate) {
 			this.container.scale.set(0);
-			const popIn = new TWEEN.Tween({ s: 0 })
+			this.popInTween = new TWEEN.Tween({ s: 0 })
 				.to({ s: 1 }, 500)
 				.easing(TWEEN.Easing.Elastic.Out)
 				.onUpdate(({ s }) => {
 					this.container.scale.set(s);
 				})
 				.start();
-			TWEEN.add(popIn);
+			TWEEN.add(this.popInTween);
+		}
+	}
+
+	/** Stop any running tweens before removal */
+	destroy() {
+		if (this.popInTween) {
+			this.popInTween.stop();
+			TWEEN.remove(this.popInTween);
+			this.popInTween = null;
 		}
 	}
 }

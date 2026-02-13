@@ -16,6 +16,7 @@
 	import NoteDetailPanel from '$lib/components/NoteDetailPanel.svelte';
 	import InlineNoteEditor from '$lib/components/InlineNoteEditor.svelte';
 	import StickerPicker from '$lib/components/StickerPicker.svelte';
+	import PhotoActionMenu from '$lib/components/PhotoActionMenu.svelte';
 	import ViewerAvatars from '$lib/components/ViewerAvatars.svelte';
 	import { TextBlock } from '$lib/canvas/objects/TextBlock';
 
@@ -54,6 +55,7 @@
 	let selectedBeacon = $state<any>(null);
 	let selectedNote = $state<any>(null);
 	let stickerPickerState = $state<{ objectId: string; x: number; y: number } | null>(null);
+	let photoMenuState = $state<{ objectId: string; x: number; y: number } | null>(null);
 
 	// Inline note editor state (owner-only, replaces NoteDetailPanel for owners)
 	let inlineEditState = $state<{
@@ -330,6 +332,15 @@
 			stickerPickerState = { objectId, x: screenX, y: screenY };
 		};
 
+		// Wire up photo tap → action menu (owner only)
+		renderer.onPhotoTapped = (objectId) => {
+			if (!isCanvasOwner) return;
+			const photoObj = renderer.getObject(objectId);
+			if (!photoObj) return;
+			const screen = renderer.worldToScreen(photoObj.container.x, photoObj.container.y);
+			photoMenuState = { objectId, x: screen.x, y: screen.y };
+		};
+
 		// Stream cursor position over WebRTC
 		renderer.app.stage.eventMode = 'static';
 		renderer.app.stage.hitArea = renderer.app.screen;
@@ -358,9 +369,9 @@
 
 			// If editability changed, force re-sync to update drag behavior on existing objects
 			if (wasEditable !== isCanvasOwner && canvasObjects.data) {
-				// Clear existing objects so syncObjects recreates them with new editable state
-				renderer.syncObjects([]);
-				renderer.syncObjects(canvasObjects.data as CanvasObjectData[]);
+				// Clear then recreate with correct editable state, but skip pop-in animations
+				renderer.syncObjects([], false);
+				renderer.syncObjects(canvasObjects.data as CanvasObjectData[], false);
 			}
 		}
 	});
@@ -394,6 +405,51 @@
 			size: { w: 240, h: 80 },
 			content: { text: 'New note...', color },
 		});
+	}
+
+	/** Upload a photo and create a polaroid object at viewport center */
+	async function addPhoto() {
+		if (!activeCanvasId || !currentUser.user) return;
+
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+		input.style.display = 'none';
+
+		input.onchange = async () => {
+			const file = input.files?.[0];
+			if (!file) return;
+
+			if (file.size > 5 * 1024 * 1024) {
+				console.error('Photo must be under 5MB');
+				return;
+			}
+
+			try {
+				const uploadUrl = await client.mutation(api.photos.generateUploadUrl, {});
+
+				const result = await fetch(uploadUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': file.type },
+					body: file,
+				});
+				const { storageId } = await result.json();
+
+				const center = renderer.getViewportCenter();
+				await client.mutation(api.photos.createPhoto, {
+					canvasId: activeCanvasId as any,
+					storageId,
+					position: { x: center.x - 130, y: center.y - 150 },
+				});
+			} catch (err) {
+				console.error('Photo upload failed:', err);
+			}
+
+			document.body.removeChild(input);
+		};
+
+		document.body.appendChild(input);
+		input.click();
 	}
 
 	/** Switch to a different canvas */
@@ -463,6 +519,37 @@
 			console.error('Failed to delete note:', err);
 		}
 	}
+
+	/** Delete a photo */
+	async function deletePhoto() {
+		if (!photoMenuState) return;
+		const id = photoMenuState.objectId;
+		photoMenuState = null;
+		try {
+			await client.mutation(api.objects.remove, { id: id as any });
+		} catch (err) {
+			console.error('Failed to delete photo:', err);
+		}
+	}
+
+	/** Edit photo caption */
+	async function editPhotoCaption() {
+		if (!photoMenuState) return;
+		const id = photoMenuState.objectId;
+		const obj = canvasObjects.data?.find((o: any) => o._id === id);
+		photoMenuState = null;
+		const currentCaption = (obj?.content as any)?.caption ?? '';
+		const newCaption = prompt('Caption:', currentCaption);
+		if (newCaption === null) return;
+		try {
+			await client.mutation(api.photos.updateCaption, {
+				id: id as any,
+				caption: newCaption,
+			});
+		} catch (err) {
+			console.error('Failed to update caption:', err);
+		}
+	}
 </script>
 
 <div bind:this={canvasContainer} class="w-screen h-screen overflow-hidden"></div>
@@ -478,6 +565,7 @@
 		isOwner={isCanvasOwner}
 		onAddNote={addNote}
 		onCreateBeacon={() => { showCreateBeacon = true; }}
+		onAddPhoto={addPhoto}
 		onFriends={() => { showFriendCode = true; }}
 		onFriendsList={() => { showFriendsList = true; }}
 		onCanvasSwitcher={() => { showCanvasSwitcher = !showCanvasSwitcher; }}
@@ -566,5 +654,15 @@
 		y={stickerPickerState.y}
 		onSelect={placeSticker}
 		onClose={() => { stickerPickerState = null; }}
+	/>
+{/if}
+
+{#if photoMenuState}
+	<PhotoActionMenu
+		x={photoMenuState.x}
+		y={photoMenuState.y}
+		onDelete={deletePhoto}
+		onEditCaption={editPhotoCaption}
+		onClose={() => { photoMenuState = null; }}
 	/>
 {/if}

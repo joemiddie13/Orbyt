@@ -128,9 +128,11 @@ export const cleanupStalePresence = internalMutation({
 	handler: async (ctx) => {
 		const cutoff = Date.now() - 60 * 1000;
 
-		// No index on lastSeen, so we scan all and filter
-		const all = await ctx.db.query("canvasPresence").collect();
-		const stale = all.filter((p) => p.lastSeen < cutoff);
+		// Use lastSeen index to efficiently find stale records
+		const stale = await ctx.db
+			.query("canvasPresence")
+			.withIndex("by_last_seen", (q) => q.lt("lastSeen", cutoff))
+			.collect();
 
 		for (const record of stale) {
 			await ctx.db.delete(record._id);

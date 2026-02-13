@@ -33,6 +33,7 @@ export interface BeaconObjectOptions {
 	objectId?: string;
 	/** Whether the current user can drag this object (default: true) */
 	editable?: boolean;
+	animate?: boolean;
 	onDragEnd?: (objectId: string, x: number, y: number) => void;
 	onDragMove?: (objectId: string, x: number, y: number) => void;
 	onTap?: (objectId: string) => void;
@@ -196,15 +197,17 @@ export class BeaconObject {
 		}
 
 		// Pop-in animation — must TWEEN.add() in v25 (tweens aren't auto-added to default group)
-		this.container.scale.set(0);
-		const popIn = new TWEEN.Tween({ s: 0 })
-			.to({ s: 1 }, 400)
-			.easing(TWEEN.Easing.Back.Out)
-			.onUpdate(({ s }) => {
-				this.container.scale.set(s);
-			})
-			.start();
-		TWEEN.add(popIn);
+		if (options.animate !== false) {
+			this.container.scale.set(0);
+			const popIn = new TWEEN.Tween({ s: 0 })
+				.to({ s: 1 }, 400)
+				.easing(TWEEN.Easing.Back.Out)
+				.onUpdate(({ s }) => {
+					this.container.scale.set(s);
+				})
+				.start();
+			TWEEN.add(popIn);
+		}
 
 		// Start pulse if not expired
 		if (!this.isExpired) {
@@ -248,6 +251,11 @@ export class BeaconObject {
 	setExpired() {
 		this.isExpired = true;
 		this.container.alpha = 0.3;
+		this.stopPulse();
+	}
+
+	/** Stop tweens before destroying — prevents stale callbacks on destroyed Graphics */
+	destroy() {
 		this.stopPulse();
 	}
 

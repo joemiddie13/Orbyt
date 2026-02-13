@@ -33,12 +33,11 @@ export const cleanupExpired = internalMutation({
 	handler: async (ctx) => {
 		const now = Date.now();
 
-		// Full table scan — acceptable for cron job with small table.
-		// If canvasObjects grows large, add an expiresAt index.
-		const allObjects = await ctx.db.query("canvasObjects").collect();
-		const expiredBeacons = allObjects.filter(
-			(obj) => obj.type === "beacon" && obj.expiresAt && obj.expiresAt < now
-		);
+		// Use compound index to find expired beacons efficiently
+		const expiredBeacons = await ctx.db
+			.query("canvasObjects")
+			.withIndex("by_type_expires", (q) => q.eq("type", "beacon").lt("expiresAt", now))
+			.collect();
 
 		for (const beacon of expiredBeacons) {
 			// Delete associated responses
@@ -92,20 +91,20 @@ export const createDirectBeacon = mutation({
 
 		const groupId = crypto.randomUUID();
 
-		// Validate all recipients are friends
-		for (const recipientUuid of args.recipientUuids) {
-			const fwd = await ctx.db
-				.query("friendships")
-				.withIndex("by_pair", (q) => q.eq("requesterId", user.uuid).eq("receiverId", recipientUuid))
-				.filter((q) => q.eq(q.field("status"), "accepted"))
-				.first();
-			const rev = await ctx.db
-				.query("friendships")
-				.withIndex("by_pair", (q) => q.eq("requesterId", recipientUuid).eq("receiverId", user.uuid))
-				.filter((q) => q.eq(q.field("status"), "accepted"))
-				.first();
+		// Validate all recipients are friends (parallel)
+		await Promise.all(args.recipientUuids.map(async (recipientUuid) => {
+			const [fwd, rev] = await Promise.all([
+				ctx.db.query("friendships")
+					.withIndex("by_pair", (q) => q.eq("requesterId", user.uuid).eq("receiverId", recipientUuid))
+					.filter((q) => q.eq(q.field("status"), "accepted"))
+					.first(),
+				ctx.db.query("friendships")
+					.withIndex("by_pair", (q) => q.eq("requesterId", recipientUuid).eq("receiverId", user.uuid))
+					.filter((q) => q.eq(q.field("status"), "accepted"))
+					.first(),
+			]);
 			if (!fwd && !rev) throw new Error("Can only send beacons to friends");
-		}
+		}));
 
 		const beaconContent = {
 			title: args.title,
@@ -118,19 +117,23 @@ export const createDirectBeacon = mutation({
 			directBeaconGroupId: groupId,
 		};
 
+		// Fetch all personal canvases in parallel (recipients + creator)
+		const allUuids = [...args.recipientUuids, user.uuid];
+		const personalCanvases = await Promise.all(
+			allUuids.map((uuid) =>
+				ctx.db.query("canvases")
+					.withIndex("by_owner", (q) => q.eq("ownerId", uuid))
+					.filter((q) => q.eq(q.field("type"), "personal"))
+					.first()
+			)
+		);
+
+		// Place beacon on each canvas that exists
 		const createdIds: string[] = [];
-
-		// Place on each recipient's personal canvas
-		for (const recipientUuid of args.recipientUuids) {
-			const personalCanvas = await ctx.db
-				.query("canvases")
-				.withIndex("by_owner", (q) => q.eq("ownerId", recipientUuid))
-				.filter((q) => q.eq(q.field("type"), "personal"))
-				.first();
-
-			if (personalCanvas) {
+		for (const canvas of personalCanvases) {
+			if (canvas) {
 				const id = await ctx.db.insert("canvasObjects", {
-					canvasId: personalCanvas._id,
+					canvasId: canvas._id,
 					creatorId: user.uuid,
 					type: "beacon",
 					position: { x: 300 + Math.random() * 500, y: 200 + Math.random() * 400 },
@@ -140,26 +143,6 @@ export const createDirectBeacon = mutation({
 				});
 				createdIds.push(id);
 			}
-		}
-
-		// Also place on the creator's own personal canvas
-		const myCanvas = await ctx.db
-			.query("canvases")
-			.withIndex("by_owner", (q) => q.eq("ownerId", user.uuid))
-			.filter((q) => q.eq(q.field("type"), "personal"))
-			.first();
-
-		if (myCanvas) {
-			const id = await ctx.db.insert("canvasObjects", {
-				canvasId: myCanvas._id,
-				creatorId: user.uuid,
-				type: "beacon",
-				position: { x: 300 + Math.random() * 500, y: 200 + Math.random() * 400 },
-				size: { w: 260, h: 100 },
-				content: beaconContent,
-				expiresAt: args.endTime,
-			});
-			createdIds.push(id);
 		}
 
 		return { groupId, createdIds };

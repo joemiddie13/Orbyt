@@ -8,7 +8,7 @@ const csp = [
 	"default-src 'self'",
 	isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self'",
 	"style-src 'self' 'unsafe-inline'",
-	"img-src 'self' data: blob:",
+	"img-src 'self' data: blob: https://*.convex.cloud",
 	"font-src 'self'",
 	`connect-src 'self' wss://*.convex.cloud https://*.convex.cloud${isDev ? " ws://localhost:* http://localhost:*" : ""}`,
 	"worker-src 'self' blob:",

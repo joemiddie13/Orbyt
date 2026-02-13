@@ -222,18 +222,30 @@ export class PanZoom {
 		this.app.ticker.add(() => {
 			if (this.locked || this.isDragging) return;
 
+			const hasVelocity = Math.abs(this.velocityX) > VELOCITY_THRESHOLD
+				|| Math.abs(this.velocityY) > VELOCITY_THRESHOLD;
+
+			// Early exit: no velocity and within bounds — nothing to do
+			if (!hasVelocity) {
+				this.velocityX = 0;
+				this.velocityY = 0;
+
+				// Only check bounds when needed (after drag ends or zoom)
+				const bounds = this.getBounds();
+				const inBounds = this.world.x <= bounds.maxX && this.world.x >= bounds.minX
+					&& this.world.y <= bounds.maxY && this.world.y >= bounds.minY;
+				if (inBounds) return;
+			}
+
 			// Apply momentum
-			if (Math.abs(this.velocityX) > VELOCITY_THRESHOLD || Math.abs(this.velocityY) > VELOCITY_THRESHOLD) {
+			if (hasVelocity) {
 				this.world.x += this.velocityX;
 				this.world.y += this.velocityY;
 				this.velocityX *= FRICTION;
 				this.velocityY *= FRICTION;
-			} else {
-				this.velocityX = 0;
-				this.velocityY = 0;
 			}
 
-			// Spring back if out of bounds (after momentum or rubber-band)
+			// Spring back if out of bounds
 			const bounds = this.getBounds();
 			if (this.world.x > bounds.maxX) {
 				this.world.x += (bounds.maxX - this.world.x) * SPRING_BACK_SPEED;

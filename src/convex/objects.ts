@@ -67,10 +67,22 @@ export const getByCanvas = query({
 			}
 		}
 
-		return ctx.db
+		const objects = await ctx.db
 			.query("canvasObjects")
 			.withIndex("by_canvas", (q) => q.eq("canvasId", args.canvasId))
 			.collect();
+
+		// Resolve storage URLs for photo objects
+		return Promise.all(
+			objects.map(async (obj) => {
+				if (obj.type === "photo") {
+					const content = obj.content as { storageId: string; caption?: string; rotation: number };
+					const imageUrl = await ctx.storage.getUrl(content.storageId as any);
+					return { ...obj, content: { ...content, imageUrl } };
+				}
+				return obj;
+			})
+		);
 	},
 });
 
