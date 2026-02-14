@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
-import * as TWEEN from '@tweenjs/tween.js';
+import './gsapInit'; // Ensure GSAP + PixiPlugin registered before any object creation
+import { gsap } from './gsapInit';
 import { PanZoom } from './interactions/PanZoom';
 import { TextBlock } from './objects/TextBlock';
 import { BeaconObject, type BeaconContent } from './objects/BeaconObject';
@@ -113,9 +114,9 @@ export class CanvasRenderer {
 		this.drawBounds();
 		this.panZoom = new PanZoom(this.app, this.world, this.canvasWidth, this.canvasHeight);
 
-		// Integrate tween.js into the PixiJS render loop + interpolation + cursor staleness
+		// GSAP runs its own rAF loop — no manual update needed.
+		// Ticker handles interpolation + cursor staleness only.
 		this.app.ticker.add(() => {
-			TWEEN.update();
 			this.interpolateRemotes();
 			this.updateCursorStaleness();
 		});
@@ -124,9 +125,13 @@ export class CanvasRenderer {
 	/**
 	 * Reconcile the visual objects on canvas with data from Convex.
 	 * Adds new objects, updates moved ones, removes deleted ones.
+	 *
+	 * Bulk load detection: if the map is empty and multiple items arrive,
+	 * individual pop-ins are suppressed in favor of a staggered entrance.
 	 */
 	syncObjects(data: CanvasObjectData[], animate = true) {
 		const incomingIds = new Set(data.map((d) => d._id));
+		const isBulkLoad = animate && this.objects.size === 0 && data.length > 1;
 
 		// Remove objects that no longer exist in the database
 		for (const [id, obj] of this.objects) {
@@ -137,6 +142,9 @@ export class CanvasRenderer {
 				this.objects.delete(id);
 			}
 		}
+
+		// Track newly created containers for stagger
+		const newContainers: Container[] = [];
 
 		// Add or update objects
 		for (const obj of data) {
@@ -169,9 +177,12 @@ export class CanvasRenderer {
 			} else if (obj.type === 'textblock') {
 				const color = obj.content?.color ?? 0xfff9c4;
 				const text = obj.content?.text ?? '';
+				// Suppress individual pop-in during bulk load — stagger handles it
+				const shouldAnimate = isBulkLoad ? false : animate;
 				const block = new TextBlock(text, obj.position.x, obj.position.y, color, {
 					objectId: obj._id,
 					editable: this.editable,
+					animate: shouldAnimate,
 					initialWidth: obj.size?.w ?? 240,
 					initialHeight: obj.size?.h ?? 0,
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
@@ -182,13 +193,15 @@ export class CanvasRenderer {
 				});
 				this.world.addChild(block.container);
 				this.objects.set(obj._id, block);
+				if (isBulkLoad) newContainers.push(block.container);
 			} else if (obj.type === 'beacon') {
 				const content = obj.content as BeaconContent;
 				const isExpired = obj.expiresAt ? obj.expiresAt < Date.now() : false;
+				const shouldAnimate = isBulkLoad ? false : animate;
 				const beacon = new BeaconObject(content, obj.position.x, obj.position.y, {
 					objectId: obj._id,
 					editable: this.editable,
-					animate,
+					animate: shouldAnimate,
 					isExpired,
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
 					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
@@ -197,12 +210,14 @@ export class CanvasRenderer {
 				});
 				this.world.addChild(beacon.container);
 				this.objects.set(obj._id, beacon);
+				if (isBulkLoad) newContainers.push(beacon.container);
 			} else if (obj.type === 'photo') {
 				const content = obj.content as PhotoContent;
+				const shouldAnimate = isBulkLoad ? false : animate;
 				const photo = new PhotoObject(content, obj.position.x, obj.position.y, {
 					objectId: obj._id,
 					editable: this.editable,
-					animate,
+					animate: shouldAnimate,
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
 					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
 					onTap: (id) => this.onPhotoTapped?.(id),
@@ -210,7 +225,13 @@ export class CanvasRenderer {
 				});
 				this.world.addChild(photo.container);
 				this.objects.set(obj._id, photo);
+				if (isBulkLoad) newContainers.push(photo.container);
 			}
+		}
+
+		// Staggered entrance for bulk loads (canvas load / canvas switch)
+		if (isBulkLoad && newContainers.length > 0) {
+			this.staggerEntrance(newContainers);
 		}
 	}
 
@@ -241,6 +262,26 @@ export class CanvasRenderer {
 			parentObj.container.addChild(sticker.container);
 			this.stickers.set(stickerData._id, sticker);
 		}
+	}
+
+	/** Staggered entrance — objects cascade in with alpha + scale, 60ms apart */
+	private staggerEntrance(containers: Container[]) {
+		for (const c of containers) {
+			c.scale.set(0);
+			c.alpha = 0;
+		}
+		gsap.to(containers.map((c) => c.scale), {
+			x: 1, y: 1,
+			duration: 0.45,
+			ease: 'back.out(1.4)',
+			stagger: 0.06,
+		});
+		gsap.to(containers, {
+			alpha: 1,
+			duration: 0.25,
+			ease: 'power2.out',
+			stagger: 0.06,
+		});
 	}
 
 	/** Update beacon response dots */

@@ -1,4 +1,5 @@
 import { Container, Graphics, HTMLText, HTMLTextStyle, type FederatedPointerEvent } from 'pixi.js';
+import { gsap } from '../gsapInit';
 import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
 
 /**
@@ -31,6 +32,8 @@ export interface TextBlockOptions {
 	objectId?: string;
 	/** Whether the current user can drag this object (default: true) */
 	editable?: boolean;
+	/** Whether to animate entrance (default: true) */
+	animate?: boolean;
 	/** Initial width from Convex (default: 240) */
 	initialWidth?: number;
 	/** Initial height from Convex (0 = auto-fit to text) */
@@ -182,6 +185,14 @@ export class TextBlock {
 
 		// HTMLText measures async — re-check height once layout settles
 		this.scheduleHeightCheck();
+
+		// Pop-in animation — note materializes with alpha + scale
+		if (options.animate !== false) {
+			this.container.scale.set(0);
+			this.container.alpha = 0;
+			gsap.to(this.container, { alpha: 1, duration: 0.15, ease: 'power2.out' });
+			gsap.to(this.container.scale, { x: 1, y: 1, duration: 0.45, ease: 'back.out(1.4)' });
+		}
 	}
 
 	/** Update the displayed text and resize the background to fit */
@@ -195,11 +206,24 @@ export class TextBlock {
 		this.scheduleHeightCheck();
 	}
 
-	/** Update the background color */
+	/** Update the background color with smooth transition */
 	updateColor(color: number) {
 		if (this.currentColor === color) return;
-		this.background.clear();
-		this.drawBackground(color);
+		const fromColor = this.currentColor;
+		const proxy = { r: (fromColor >> 16) & 0xff, g: (fromColor >> 8) & 0xff, b: fromColor & 0xff };
+		const toR = (color >> 16) & 0xff;
+		const toG = (color >> 8) & 0xff;
+		const toB = color & 0xff;
+		gsap.to(proxy, {
+			r: toR, g: toG, b: toB,
+			duration: 0.35,
+			ease: 'power2.inOut',
+			onUpdate: () => {
+				const c = (Math.round(proxy.r) << 16) | (Math.round(proxy.g) << 8) | Math.round(proxy.b);
+				this.background.clear();
+				this.drawBackground(c);
+			},
+		});
 	}
 
 	/** Update size from Convex sync (external data change) */
@@ -425,5 +449,31 @@ export class TextBlock {
 		this.background.clear();
 		this.drawBackground(this.currentColor);
 		this.updateResizeZones();
+	}
+
+	// ── Edit mode animations ────────────────────────────────────────────
+
+	/** Brief lift before DOM overlay takes over — resolves when animation finishes */
+	animateEditLift(): Promise<void> {
+		return new Promise((resolve) => {
+			gsap.to(this.container.scale, {
+				x: 1.04, y: 1.04,
+				duration: 0.18,
+				ease: 'power2.out',
+				onComplete: () => {
+					this.container.visible = false;
+					resolve();
+				},
+			});
+		});
+	}
+
+	/** Spring back to normal when editor closes */
+	animateEditReturn() {
+		this.container.visible = true;
+		this.container.scale.set(1.04);
+		this.container.alpha = 0.7;
+		gsap.to(this.container.scale, { x: 1, y: 1, duration: 0.3, ease: 'back.out(2)' });
+		gsap.to(this.container, { alpha: 1, duration: 0.2, ease: 'power2.out' });
 	}
 }

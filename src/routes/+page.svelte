@@ -282,7 +282,7 @@
 		};
 
 		// Wire up note tap → inline editor (owner) or detail panel (non-owner)
-		renderer.onNoteTapped = (objectId) => {
+		renderer.onNoteTapped = async (objectId) => {
 			const obj = canvasObjects.data?.find((o: any) => o._id === objectId);
 			if (!obj || obj.type !== 'textblock') return;
 
@@ -292,6 +292,10 @@
 				if (!block || !(block instanceof TextBlock)) return;
 				const screen = renderer.worldToScreen(block.container.x, block.container.y);
 				const scale = renderer.getScale();
+
+				// Animate lift, then show DOM overlay
+				await block.animateEditLift();
+
 				inlineEditState = {
 					note: obj,
 					screenX: screen.x,
@@ -300,8 +304,6 @@
 					screenHeight: block.height * scale,
 					scale,
 				};
-				// Hide the PixiJS note while editing (DOM overlay replaces it)
-				block.container.visible = false;
 				renderer.lockPanZoom();
 			} else {
 				// Non-owner: read-only detail panel
@@ -481,11 +483,15 @@
 		stickerPickerState = null;
 	}
 
-	/** Close inline editor: restore PixiJS note visibility and unlock pan/zoom */
+	/** Close inline editor: spring note back and unlock pan/zoom */
 	function closeInlineEditor() {
 		if (inlineEditState) {
 			const block = renderer.getObject(inlineEditState.note._id);
-			if (block) block.container.visible = true;
+			if (block instanceof TextBlock) {
+				block.animateEditReturn();
+			} else if (block) {
+				block.container.visible = true;
+			}
 			renderer.unlockPanZoom();
 			inlineEditState = null;
 		}

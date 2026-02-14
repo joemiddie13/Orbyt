@@ -1,5 +1,5 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
-import * as TWEEN from '@tweenjs/tween.js';
+import { gsap } from '../gsapInit';
 import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
 
 /**
@@ -46,7 +46,7 @@ export class BeaconObject {
 	container: Container;
 	objectId?: string;
 	private glowRing: Graphics;
-	private pulseTween: TWEEN.Tween<{ alpha: number; scale: number }> | null = null;
+	private pulseTween: gsap.core.Tween | null = null;
 	private isExpired: boolean;
 
 	constructor(content: BeaconContent, x: number, y: number, options: BeaconObjectOptions = {}) {
@@ -196,17 +196,10 @@ export class BeaconObject {
 			});
 		}
 
-		// Pop-in animation — must TWEEN.add() in v25 (tweens aren't auto-added to default group)
+		// Pop-in animation
 		if (options.animate !== false) {
 			this.container.scale.set(0);
-			const popIn = new TWEEN.Tween({ s: 0 })
-				.to({ s: 1 }, 400)
-				.easing(TWEEN.Easing.Back.Out)
-				.onUpdate(({ s }) => {
-					this.container.scale.set(s);
-				})
-				.start();
-			TWEEN.add(popIn);
+			gsap.to(this.container.scale, { x: 1, y: 1, duration: 0.4, ease: 'back.out(1.7)' });
 		}
 
 		// Start pulse if not expired
@@ -226,25 +219,29 @@ export class BeaconObject {
 	}
 
 	private startPulse() {
-		const target = { alpha: 0.2, scale: 1.0 };
-		this.pulseTween = new TWEEN.Tween(target)
-			.to({ alpha: 0.5, scale: 1.08 }, 1500)
-			.easing(TWEEN.Easing.Sinusoidal.InOut)
-			.repeat(Infinity)
-			.yoyo(true)
-			.onUpdate(({ alpha, scale }) => {
-				this.glowRing.alpha = alpha;
-				this.glowRing.scale.set(scale);
-			})
-			.start();
-		TWEEN.add(this.pulseTween);
+		this.glowRing.alpha = 0.2;
+		this.glowRing.scale.set(1.0);
+		this.pulseTween = gsap.to(this.glowRing, {
+			alpha: 0.5,
+			duration: 1.5,
+			ease: 'sine.inOut',
+			repeat: -1,
+			yoyo: true,
+		});
+		gsap.to(this.glowRing.scale, {
+			x: 1.08,
+			y: 1.08,
+			duration: 1.5,
+			ease: 'sine.inOut',
+			repeat: -1,
+			yoyo: true,
+		});
 	}
 
 	stopPulse() {
-		if (this.pulseTween) {
-			this.pulseTween.stop();
-			this.pulseTween = null;
-		}
+		gsap.killTweensOf(this.glowRing);
+		gsap.killTweensOf(this.glowRing.scale);
+		this.pulseTween = null;
 		this.glowRing.alpha = 0.1;
 	}
 

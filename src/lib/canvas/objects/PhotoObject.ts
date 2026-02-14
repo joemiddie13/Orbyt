@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
-import * as TWEEN from '@tweenjs/tween.js';
+import { gsap } from '../gsapInit';
 import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
 
 /**
@@ -112,15 +112,10 @@ export class PhotoObject {
 			});
 		}
 
-		// Pop-in animation — must TWEEN.add() in v25
+		// Pop-in animation
 		if (options.animate !== false) {
 			this.container.scale.set(0);
-			const popIn = new TWEEN.Tween({ s: 0 })
-				.to({ s: 1 }, 400)
-				.easing(TWEEN.Easing.Back.Out)
-				.onUpdate(({ s }) => { this.container.scale.set(s); })
-				.start();
-			TWEEN.add(popIn);
+			gsap.to(this.container.scale, { x: 1, y: 1, duration: 0.4, ease: 'back.out(1.7)' });
 		}
 	}
 

@@ -1,5 +1,5 @@
 import { Container, Text, TextStyle } from 'pixi.js';
-import * as TWEEN from '@tweenjs/tween.js';
+import { gsap } from '../gsapInit';
 
 /**
  * StickerReaction — a small emoji sticker attached to a canvas object.
@@ -36,7 +36,7 @@ export interface StickerData {
 export class StickerReaction {
 	container: Container;
 	stickerId: string;
-	private popInTween: TWEEN.Tween<{ s: number }> | null = null;
+	private popInTween: gsap.core.Tween | null = null;
 
 	constructor(data: StickerData, animate = true) {
 		this.stickerId = data._id;
@@ -52,25 +52,19 @@ export class StickerReaction {
 		emoji.anchor.set(0.5);
 		this.container.addChild(emoji);
 
-		// Pop-in animation — must TWEEN.add() in v25 (tweens aren't auto-added to default group)
+		// Pop-in animation
 		if (animate) {
 			this.container.scale.set(0);
-			this.popInTween = new TWEEN.Tween({ s: 0 })
-				.to({ s: 1 }, 500)
-				.easing(TWEEN.Easing.Elastic.Out)
-				.onUpdate(({ s }) => {
-					this.container.scale.set(s);
-				})
-				.start();
-			TWEEN.add(this.popInTween);
+			this.popInTween = gsap.to(this.container.scale, {
+				x: 1, y: 1, duration: 0.5, ease: 'elastic.out(1, 0.3)',
+			});
 		}
 	}
 
 	/** Stop any running tweens before removal */
 	destroy() {
 		if (this.popInTween) {
-			this.popInTween.stop();
-			TWEEN.remove(this.popInTween);
+			this.popInTween.kill();
 			this.popInTween = null;
 		}
 	}
