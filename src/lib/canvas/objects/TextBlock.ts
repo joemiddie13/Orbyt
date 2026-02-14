@@ -38,6 +38,8 @@ export interface TextBlockOptions {
 	initialWidth?: number;
 	/** Initial height from Convex (0 = auto-fit to text) */
 	initialHeight?: number;
+	/** Called when the user starts dragging this block (movement confirmed) */
+	onDragStart?: (objectId: string) => void;
 	/** Called when the user finishes dragging this block */
 	onDragEnd?: (objectId: string, x: number, y: number) => void;
 	/** Called continuously during drag with intermediate positions */
@@ -76,6 +78,8 @@ export class TextBlock {
 	private currentColor: number = 0xfff9c4;
 	private options: TextBlockOptions;
 	private style: HTMLTextStyle;
+	/** Active color transition tween (killed before starting a new one) */
+	private colorTween: gsap.core.Tween | null = null;
 
 	/** User-set minimum height (0 = auto-fit to text only) */
 	private userHeight = 0;
@@ -149,7 +153,14 @@ export class TextBlock {
 		// Owner: full drag + long-press. Visitor: long-press only (sticker reactions).
 		if (options.editable !== false) {
 			makeDraggable(this.container, {
+				onDragStart: () => {
+					this.animateDragLift();
+					if (this.objectId && options.onDragStart) {
+						options.onDragStart(this.objectId);
+					}
+				},
 				onDragEnd: (finalX, finalY) => {
+					this.animateDragDrop();
 					if (this.objectId && options.onDragEnd) {
 						options.onDragEnd(this.objectId, finalX, finalY);
 					}
@@ -209,12 +220,18 @@ export class TextBlock {
 	/** Update the background color with smooth transition */
 	updateColor(color: number) {
 		if (this.currentColor === color) return;
+		// Kill previous color tween to prevent leak (#7)
+		if (this.colorTween) {
+			this.colorTween.kill();
+			this.colorTween = null;
+		}
 		const fromColor = this.currentColor;
+		this.currentColor = color; // Set target immediately so rapid calls don't start from stale color
 		const proxy = { r: (fromColor >> 16) & 0xff, g: (fromColor >> 8) & 0xff, b: fromColor & 0xff };
 		const toR = (color >> 16) & 0xff;
 		const toG = (color >> 8) & 0xff;
 		const toB = color & 0xff;
-		gsap.to(proxy, {
+		this.colorTween = gsap.to(proxy, {
 			r: toR, g: toG, b: toB,
 			duration: 0.35,
 			ease: 'power2.inOut',
@@ -223,6 +240,7 @@ export class TextBlock {
 				this.background.clear();
 				this.drawBackground(c);
 			},
+			onComplete: () => { this.colorTween = null; },
 		});
 	}
 
@@ -451,10 +469,78 @@ export class TextBlock {
 		this.updateResizeZones();
 	}
 
+	// ── Drag animations ─────────────────────────────────────────────────
+
+	/** Tilt direction randomized per lift — paper doesn't always tilt the same way */
+	private liftRotation = 0;
+
+	/** Lift note off the canvas like peeling paper — scale up + slight rotation tilt */
+	animateDragLift() {
+		gsap.killTweensOf(this.container.scale);
+		gsap.killTweensOf(this.container);
+
+		// Random tilt direction: slight rotation like picking up a corner
+		this.liftRotation = (Math.random() > 0.5 ? 1 : -1) * (0.02 + Math.random() * 0.02);
+
+		const tl = gsap.timeline();
+		tl.to(this.container.scale, {
+			x: 1.05, y: 1.05,
+			duration: 0.2,
+			ease: 'power2.out',
+		}, 0);
+		tl.to(this.container, {
+			rotation: this.liftRotation,
+			duration: 0.25,
+			ease: 'power2.out',
+		}, 0);
+	}
+
+	/** Drop note back onto the canvas — squash-stretch impact + paper wobble settling */
+	animateDragDrop() {
+		gsap.killTweensOf(this.container.scale);
+		gsap.killTweensOf(this.container);
+
+		const tl = gsap.timeline();
+
+		// Squash on impact: slightly wider + shorter
+		tl.to(this.container.scale, {
+			x: 1.03, y: 0.97,
+			duration: 0.1,
+			ease: 'power2.in',
+		});
+
+		// Stretch back and settle to 1.0
+		tl.to(this.container.scale, {
+			x: 1, y: 1,
+			duration: 0.3,
+			ease: 'elastic.out(1, 0.4)',
+		});
+
+		// Paper wobble: rotation oscillates back to 0
+		tl.to(this.container, {
+			rotation: -this.liftRotation * 0.5,
+			duration: 0.12,
+			ease: 'power2.inOut',
+		}, 0);
+		tl.to(this.container, {
+			rotation: this.liftRotation * 0.25,
+			duration: 0.15,
+			ease: 'sine.inOut',
+		});
+		tl.to(this.container, {
+			rotation: 0,
+			duration: 0.2,
+			ease: 'power2.out',
+		});
+	}
+
 	// ── Edit mode animations ────────────────────────────────────────────
 
 	/** Brief lift before DOM overlay takes over — resolves when animation finishes */
 	animateEditLift(): Promise<void> {
+		// Kill any running drag/edit tweens to prevent conflicts (#8)
+		gsap.killTweensOf(this.container.scale);
+		gsap.killTweensOf(this.container);
 		return new Promise((resolve) => {
 			gsap.to(this.container.scale, {
 				x: 1.04, y: 1.04,
@@ -470,10 +556,24 @@ export class TextBlock {
 
 	/** Spring back to normal when editor closes */
 	animateEditReturn() {
+		// Kill any running lift tweens to prevent conflicts (#8)
+		gsap.killTweensOf(this.container.scale);
+		gsap.killTweensOf(this.container);
 		this.container.visible = true;
 		this.container.scale.set(1.04);
 		this.container.alpha = 0.7;
+		this.container.rotation = 0; // Reset any residual drag rotation
 		gsap.to(this.container.scale, { x: 1, y: 1, duration: 0.3, ease: 'back.out(2)' });
 		gsap.to(this.container, { alpha: 1, duration: 0.2, ease: 'power2.out' });
+	}
+
+	/** Kill all running GSAP tweens on this object — call before removal (#10) */
+	destroy() {
+		if (this.colorTween) {
+			this.colorTween.kill();
+			this.colorTween = null;
+		}
+		gsap.killTweensOf(this.container);
+		gsap.killTweensOf(this.container.scale);
 	}
 }

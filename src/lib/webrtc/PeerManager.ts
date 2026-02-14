@@ -11,6 +11,8 @@ import type { DataChannelMessage, PeerManagerCallbacks } from './types';
 
 const CURSOR_THROTTLE = 50; // 20Hz — smooth cursor movement
 const DRAG_THROTTLE = 40; // 25Hz — smooth drag streaming
+const MAX_PROCESSED_SIGNALS = 500; // Cap to prevent unbounded growth (#11)
+const DRAG_START_DEDUP_MS = 200; // Ignore duplicate drag-starts within 200ms (#12)
 
 export class PeerManager {
 	private peers = new Map<string, PeerConnection>();
@@ -26,6 +28,9 @@ export class PeerManager {
 
 	// Track signals we've already processed to avoid duplicates
 	private processedSignalIds = new Set<string>();
+
+	// Dedup drag-start sends per objectId (#12)
+	private lastDragStartSend = new Map<string, number>();
 
 	constructor(
 		localUserId: string,
@@ -105,6 +110,17 @@ export class PeerManager {
 			}
 		}
 
+		// Cap processedSignalIds to prevent unbounded memory growth (#11)
+		if (this.processedSignalIds.size > MAX_PROCESSED_SIGNALS) {
+			const excess = this.processedSignalIds.size - MAX_PROCESSED_SIGNALS;
+			let removed = 0;
+			for (const id of this.processedSignalIds) {
+				if (removed >= excess) break;
+				this.processedSignalIds.delete(id);
+				removed++;
+			}
+		}
+
 		return consumed;
 	}
 
@@ -120,6 +136,20 @@ export class PeerManager {
 			username: this.localUsername,
 			x: worldX,
 			y: worldY,
+		});
+	}
+
+	/** Send drag-start event (deduped per objectId within 200ms window) */
+	sendDragStart(objectId: string) {
+		const now = Date.now();
+		const lastSend = this.lastDragStartSend.get(objectId) ?? 0;
+		if (now - lastSend < DRAG_START_DEDUP_MS) return;
+		this.lastDragStartSend.set(objectId, now);
+
+		this.broadcast({
+			type: 'drag-start',
+			userId: this.localUserId,
+			objectId,
 		});
 	}
 
@@ -142,6 +172,7 @@ export class PeerManager {
 	/** Send final drag position (immediate, not throttled) */
 	sendDragEnd(objectId: string, x: number, y: number) {
 		this.lastDragSend.delete(objectId);
+		this.lastDragStartSend.delete(objectId);
 
 		this.broadcast({
 			type: 'drag-end',
@@ -173,6 +204,7 @@ export class PeerManager {
 		}
 		this.peers.clear();
 		this.lastDragSend.clear();
+		this.lastDragStartSend.clear();
 	}
 
 	destroy() {
@@ -207,6 +239,9 @@ export class PeerManager {
 		switch (msg.type) {
 			case 'cursor':
 				this.callbacks.onRemoteCursor(msg.userId, msg.username, msg.x, msg.y);
+				break;
+			case 'drag-start':
+				this.callbacks.onRemoteDragStart(msg.userId, msg.objectId);
 				break;
 			case 'drag':
 				this.callbacks.onRemoteDrag(msg.userId, msg.objectId, msg.x, msg.y);

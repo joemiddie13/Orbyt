@@ -156,13 +156,16 @@
 			onRemoteCursor: (userId, username, x, y) => {
 				renderer?.updateRemoteCursor(userId, username, x, y);
 			},
+			onRemoteDragStart: (_userId, objectId) => {
+				renderer?.animateRemoteDragLift(objectId);
+			},
 			onRemoteDrag: (_userId, objectId, x, y) => {
 				renderer?.moveObjectRemotely(objectId, x, y);
 			},
 			onRemoteDragEnd: (_userId, objectId, x, y) => {
 				renderer?.moveObjectRemotely(objectId, x, y);
-				// Let Convex set the final position, stop interpolating
 				renderer?.stopRemoteObjectInterpolation(objectId);
+				renderer?.animateRemoteDragDrop(objectId);
 			},
 			onPeerConnected: (userId) => {
 				webrtcConnected = peerManager?.hasConnections ?? false;
@@ -254,6 +257,11 @@
 
 		renderer = new CanvasRenderer();
 		await renderer.init(canvasContainer);
+
+		// Wire up drag-start → WebRTC broadcast (lift animation on remote)
+		renderer.onObjectDragStart = (objectId) => {
+			peerManager?.sendDragStart(objectId);
+		};
 
 		// Wire up drag-end → Convex mutation + WebRTC broadcast
 		renderer.onObjectMoved = async (objectId, x, y) => {

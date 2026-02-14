@@ -8,6 +8,7 @@
 
 export type DataChannelMessage =
 	| CursorMessage
+	| DragStartMessage
 	| DragMessage
 	| DragEndMessage
 	| PingMessage
@@ -19,6 +20,12 @@ export interface CursorMessage {
 	username: string;
 	x: number; // world coordinates
 	y: number;
+}
+
+export interface DragStartMessage {
+	type: 'drag-start';
+	userId: string;
+	objectId: string;
 }
 
 export interface DragMessage {
@@ -57,6 +64,7 @@ export interface RemoteCursor {
 /** Callbacks from PeerConnection/PeerManager to the page */
 export interface PeerManagerCallbacks {
 	onRemoteCursor: (userId: string, username: string, x: number, y: number) => void;
+	onRemoteDragStart: (userId: string, objectId: string) => void;
 	onRemoteDrag: (userId: string, objectId: string, x: number, y: number) => void;
 	onRemoteDragEnd: (userId: string, objectId: string, x: number, y: number) => void;
 	onPeerConnected: (userId: string) => void;

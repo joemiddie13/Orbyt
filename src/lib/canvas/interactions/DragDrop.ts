@@ -15,6 +15,8 @@ const LONG_PRESS_DURATION = 500;
 const LONG_PRESS_THRESHOLD = 5;
 
 export interface DragDropOptions {
+	/** Called when a drag begins (movement exceeds threshold) */
+	onDragStart?: () => void;
 	/** Called when a drag ends with the final position */
 	onDragEnd?: (x: number, y: number) => void;
 	/** Called continuously during drag with intermediate positions */
@@ -88,6 +90,7 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 	let startScreenX = 0;
 	let startScreenY = 0;
 	let longPressFired = false;
+	let dragStartFired = false;
 
 	target.eventMode = 'static';
 	target.cursor = 'grab';
@@ -95,6 +98,7 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 	target.on('pointerdown', (event: FederatedPointerEvent) => {
 		isDragging = true;
 		longPressFired = false;
+		dragStartFired = false;
 		target.cursor = 'grabbing';
 
 		startScreenX = event.globalX;
@@ -132,6 +136,11 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 			if (longPressTimer) {
 				clearTimeout(longPressTimer);
 				longPressTimer = null;
+			}
+			// Fire drag start once when movement is confirmed
+			if (!dragStartFired) {
+				dragStartFired = true;
+				options.onDragStart?.();
 			}
 		}
 

@@ -69,6 +69,12 @@ export class CanvasRenderer {
 	/** Cache cursor colors by userId to avoid recomputing */
 	private cursorColorCache = new Map<string, number>();
 
+	/** Active stagger tweens — killed on canvas switch to prevent orphans (#9) */
+	private activeStaggerTweens: gsap.core.Tween[] = [];
+
+	/** Callback for when an object drag begins (movement confirmed) */
+	onObjectDragStart?: (objectId: string) => void;
+
 	/** Callback for when an object is dragged to a new position */
 	onObjectMoved?: (objectId: string, x: number, y: number) => void;
 
@@ -133,10 +139,17 @@ export class CanvasRenderer {
 		const incomingIds = new Set(data.map((d) => d._id));
 		const isBulkLoad = animate && this.objects.size === 0 && data.length > 1;
 
+		// Kill any in-flight stagger tweens before reconciling (#9)
+		for (const tween of this.activeStaggerTweens) {
+			tween.kill();
+		}
+		this.activeStaggerTweens = [];
+
 		// Remove objects that no longer exist in the database
 		for (const [id, obj] of this.objects) {
 			if (!incomingIds.has(id)) {
 				if (obj instanceof BeaconObject) obj.destroy();
+				if (obj instanceof TextBlock) obj.destroy();
 				this.world.removeChild(obj.container);
 				obj.container.destroy({ children: true });
 				this.objects.delete(id);
@@ -185,6 +198,7 @@ export class CanvasRenderer {
 					animate: shouldAnimate,
 					initialWidth: obj.size?.w ?? 240,
 					initialHeight: obj.size?.h ?? 0,
+					onDragStart: (id) => this.onObjectDragStart?.(id),
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
 					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
 					onLongPress: (id, sx, sy) => this.onObjectLongPress?.(id, sx, sy),
@@ -270,18 +284,27 @@ export class CanvasRenderer {
 			c.scale.set(0);
 			c.alpha = 0;
 		}
-		gsap.to(containers.map((c) => c.scale), {
+		const scaleTween = gsap.to(containers.map((c) => c.scale), {
 			x: 1, y: 1,
 			duration: 0.45,
 			ease: 'back.out(1.4)',
 			stagger: 0.06,
+			onComplete: () => this.removeStaggerTween(scaleTween),
 		});
-		gsap.to(containers, {
+		const alphaTween = gsap.to(containers, {
 			alpha: 1,
 			duration: 0.25,
 			ease: 'power2.out',
 			stagger: 0.06,
+			onComplete: () => this.removeStaggerTween(alphaTween),
 		});
+		this.activeStaggerTweens.push(scaleTween, alphaTween);
+	}
+
+	/** Remove a completed stagger tween from the active list */
+	private removeStaggerTween(tween: gsap.core.Tween) {
+		const idx = this.activeStaggerTweens.indexOf(tween);
+		if (idx !== -1) this.activeStaggerTweens.splice(idx, 1);
 	}
 
 	/** Update beacon response dots */
@@ -387,6 +410,22 @@ export class CanvasRenderer {
 	/** Stop interpolating an object (drag ended, Convex will set final position) */
 	stopRemoteObjectInterpolation(objectId: string) {
 		this.remoteObjectTargets.delete(objectId);
+	}
+
+	/** Play drag-lift animation on a remote object (WebRTC drag-start) */
+	animateRemoteDragLift(objectId: string) {
+		const obj = this.objects.get(objectId);
+		if (obj instanceof TextBlock) {
+			obj.animateDragLift();
+		}
+	}
+
+	/** Play drag-drop animation on a remote object (WebRTC drag-end) */
+	animateRemoteDragDrop(objectId: string) {
+		const obj = this.objects.get(objectId);
+		if (obj instanceof TextBlock) {
+			obj.animateDragDrop();
+		}
 	}
 
 	private createCursorVisual(userId: string, username: string): Container {
