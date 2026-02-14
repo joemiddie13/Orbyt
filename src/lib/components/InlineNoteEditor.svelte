@@ -216,7 +216,9 @@
 		position: fixed;
 		inset: 0;
 		z-index: 50;
-		background: rgba(0, 0, 0, 0.2);
+		background: rgba(0, 0, 0, 0.35);
+		backdrop-filter: blur(4px);
+		-webkit-backdrop-filter: blur(4px);
 	}
 
 	.inline-editor-toolbar {

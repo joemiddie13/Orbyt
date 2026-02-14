@@ -23,20 +23,20 @@
 	onclick={onClose}
 >
 	<div
-		class="absolute bg-white rounded-xl shadow-2xl border border-stone-200 overflow-hidden"
+		class="absolute glass-panel rounded-xl overflow-hidden"
 		style="left: {left}px; top: {top}px; min-width: 160px;"
 		onclick={(e) => e.stopPropagation()}
 	>
 		<button
 			onclick={onEditCaption}
-			class="w-full px-4 py-2.5 text-left text-sm text-stone-700 hover:bg-stone-50 active:bg-stone-100 transition cursor-pointer flex items-center gap-2"
+			class="w-full px-4 py-2.5 text-left text-sm text-white/70 hover:bg-white/10 active:bg-white/15 transition cursor-pointer flex items-center gap-2"
 		>
 			<span class="text-base">✏️</span> Edit Caption
 		</button>
-		<div class="h-px bg-stone-100"></div>
+		<div class="h-px bg-white/[0.08]"></div>
 		<button
 			onclick={onDelete}
-			class="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 active:bg-red-100 transition cursor-pointer flex items-center gap-2"
+			class="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 active:bg-red-500/15 transition cursor-pointer flex items-center gap-2"
 		>
 			<span class="text-base">🗑️</span> Delete Photo
 		</button>

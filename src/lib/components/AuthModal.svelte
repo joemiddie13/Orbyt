@@ -47,12 +47,12 @@
 	}
 </script>
 
-<div bind:this={backdrop} class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-	<div bind:this={panel} class="w-full max-w-sm mx-4 rounded-2xl bg-white/95 shadow-2xl p-8">
-		<h1 class="text-2xl font-bold text-center text-stone-800 mb-1">
+<div bind:this={backdrop} class="fixed inset-0 z-50 flex items-center justify-center glass-backdrop">
+	<div bind:this={panel} class="w-full max-w-sm mx-4 rounded-2xl glass-panel p-8">
+		<h1 class="text-2xl font-bold text-center text-white mb-1">
 			astrophage
 		</h1>
-		<p class="text-sm text-center text-stone-500 mb-6">
+		<p class="text-sm text-center text-white/50 mb-6">
 			{mode === 'signin' ? 'Welcome back' : 'Create your account'}
 		</p>
 
@@ -62,7 +62,7 @@
 					type="text"
 					bind:value={displayName}
 					placeholder="Display name"
-					class="px-4 py-3 rounded-xl bg-stone-100 border border-stone-200 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 transition"
+					class="px-4 py-3 rounded-xl glass-input transition"
 				/>
 			{/if}
 
@@ -72,7 +72,7 @@
 				placeholder="Username"
 				required
 				autocomplete="username"
-				class="px-4 py-3 rounded-xl bg-stone-100 border border-stone-200 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 transition"
+				class="px-4 py-3 rounded-xl glass-input transition"
 			/>
 
 			<input
@@ -83,17 +83,17 @@
 				minlength="10"
 				maxlength="64"
 				autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
-				class="px-4 py-3 rounded-xl bg-stone-100 border border-stone-200 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 transition"
+				class="px-4 py-3 rounded-xl glass-input transition"
 			/>
 
 			{#if error}
-				<p class="text-sm text-red-500 text-center">{error}</p>
+				<p class="text-sm text-red-400 text-center">{error}</p>
 			{/if}
 
 			<button
 				type="submit"
 				disabled={isSubmitting}
-				class="py-3 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 active:bg-amber-700 disabled:opacity-50 transition cursor-pointer"
+				class="py-3 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 active:bg-amber-700 disabled:opacity-50 transition cursor-pointer campfire-btn"
 			>
 				{#if isSubmitting}
 					...
@@ -103,9 +103,9 @@
 			</button>
 		</form>
 
-		<p class="text-sm text-center text-stone-500 mt-6">
+		<p class="text-sm text-center text-white/50 mt-6">
 			{mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}
-			<button onclick={toggleMode} class="text-amber-600 font-medium hover:underline cursor-pointer">
+			<button onclick={toggleMode} class="text-amber-400 font-medium hover:underline cursor-pointer">
 				{mode === 'signin' ? 'Sign up' : 'Sign in'}
 			</button>
 		</p>

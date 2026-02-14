@@ -1,3 +1,4 @@
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap');
 @import "tailwindcss";
 
 /* Reset everything to zero — the canvas IS the app */
@@ -7,4 +8,45 @@ html, body {
 	width: 100%;
 	height: 100%;
 	overflow: hidden;
+	font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
+}
+
+/* Glassmorphism — "Cozy Campfire in Space" design system */
+.glass-panel {
+	background: rgba(15, 14, 26, 0.82);
+	backdrop-filter: blur(24px);
+	-webkit-backdrop-filter: blur(24px);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.glass-backdrop {
+	background: rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+}
+
+.glass-input {
+	background: rgba(255, 255, 255, 0.06);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	color: white;
+}
+
+.glass-input:focus {
+	border-color: rgba(245, 158, 11, 0.5);
+	box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+	outline: none;
+}
+
+.glass-input::placeholder {
+	color: rgba(255, 255, 255, 0.35);
+}
+
+/* Warm hover glow on action buttons */
+.campfire-btn {
+	transition: box-shadow 0.2s ease, background-color 0.15s ease;
+}
+
+.campfire-btn:hover {
+	box-shadow: 0 0 16px rgba(245, 158, 11, 0.3);
 }

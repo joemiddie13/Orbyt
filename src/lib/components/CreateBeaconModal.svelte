@@ -90,16 +90,16 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div
-	class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+	class="fixed inset-0 z-50 flex items-center justify-center glass-backdrop"
 	onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
 >
-	<div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[85vh] flex flex-col">
+	<div class="glass-panel rounded-2xl w-full max-w-md mx-4 overflow-hidden max-h-[85vh] flex flex-col">
 		<div class="p-6 flex-shrink-0">
 			<div class="flex items-center justify-between mb-5">
-				<h2 class="text-lg font-semibold text-stone-800">Create Beacon</h2>
+				<h2 class="text-lg font-semibold text-white">Create Beacon</h2>
 				<button
 					onclick={onClose}
-					class="text-stone-400 hover:text-stone-600 transition cursor-pointer"
+					class="text-white/40 hover:text-white/70 transition cursor-pointer"
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -110,75 +110,75 @@
 
 		<div class="flex-1 overflow-y-auto px-6 pb-6 space-y-4">
 			<div>
-				<label class="text-sm text-stone-500 mb-1 block" for="beacon-title">What's happening?</label>
+				<label class="text-sm text-white/50 mb-1 block" for="beacon-title">What's happening?</label>
 				<input
 					id="beacon-title"
 					type="text"
 					bind:value={title}
 					placeholder="Pickup basketball, Coffee run, Movie night..."
 					maxlength="200"
-					class="w-full px-3 py-2 bg-stone-100 rounded-xl text-sm text-stone-800 placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-orange-400"
+					class="w-full px-3 py-2 rounded-xl glass-input text-sm"
 				/>
 			</div>
 
 			<div>
-				<label class="text-sm text-stone-500 mb-1 block" for="beacon-desc">Details (optional)</label>
+				<label class="text-sm text-white/50 mb-1 block" for="beacon-desc">Details (optional)</label>
 				<textarea
 					id="beacon-desc"
 					bind:value={description}
 					placeholder="Any extra info..."
 					rows="2"
 					maxlength="500"
-					class="w-full px-3 py-2 bg-stone-100 rounded-xl text-sm text-stone-800 placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+					class="w-full px-3 py-2 rounded-xl glass-input text-sm resize-none"
 				></textarea>
 			</div>
 
 			<div>
-				<label class="text-sm text-stone-500 mb-1 block" for="beacon-loc">Where? (optional)</label>
+				<label class="text-sm text-white/50 mb-1 block" for="beacon-loc">Where? (optional)</label>
 				<input
 					id="beacon-loc"
 					type="text"
 					bind:value={locationAddress}
 					placeholder="The park, Mike's house, Downtown..."
 					maxlength="200"
-					class="w-full px-3 py-2 bg-stone-100 rounded-xl text-sm text-stone-800 placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-orange-400"
+					class="w-full px-3 py-2 rounded-xl glass-input text-sm"
 				/>
 			</div>
 
 			<div class="grid grid-cols-2 gap-3">
 				<div>
-					<label class="text-sm text-stone-500 mb-1 block" for="beacon-start">Start</label>
+					<label class="text-sm text-white/50 mb-1 block" for="beacon-start">Start</label>
 					<input
 						id="beacon-start"
 						type="datetime-local"
 						bind:value={startTime}
-						class="w-full px-3 py-2 bg-stone-100 rounded-xl text-sm text-stone-800 outline-none focus:ring-2 focus:ring-orange-400"
+						class="w-full px-3 py-2 rounded-xl glass-input text-sm"
 					/>
 				</div>
 				<div>
-					<label class="text-sm text-stone-500 mb-1 block" for="beacon-end">End</label>
+					<label class="text-sm text-white/50 mb-1 block" for="beacon-end">End</label>
 					<input
 						id="beacon-end"
 						type="datetime-local"
 						bind:value={endTime}
-						class="w-full px-3 py-2 bg-stone-100 rounded-xl text-sm text-stone-800 outline-none focus:ring-2 focus:ring-orange-400"
+						class="w-full px-3 py-2 rounded-xl glass-input text-sm"
 					/>
 				</div>
 			</div>
 
 			<!-- Visibility -->
 			<div>
-				<p class="text-sm text-stone-500 mb-2">Who can see this?</p>
+				<p class="text-sm text-white/50 mb-2">Who can see this?</p>
 				<div class="flex gap-2">
 					<button
 						onclick={() => { visibilityType = 'canvas'; }}
-						class="flex-1 py-2 rounded-xl text-sm font-medium transition cursor-pointer {visibilityType === 'canvas' ? 'bg-orange-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}"
+						class="flex-1 py-2 rounded-xl text-sm font-medium transition cursor-pointer {visibilityType === 'canvas' ? 'bg-orange-500 text-white' : 'bg-white/[0.06] text-white/60 hover:bg-white/10'}"
 					>
 						Everyone on canvas
 					</button>
 					<button
 						onclick={() => { visibilityType = 'direct'; }}
-						class="flex-1 py-2 rounded-xl text-sm font-medium transition cursor-pointer {visibilityType === 'direct' ? 'bg-teal-500 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}"
+						class="flex-1 py-2 rounded-xl text-sm font-medium transition cursor-pointer {visibilityType === 'direct' ? 'bg-teal-500 text-white' : 'bg-white/[0.06] text-white/60 hover:bg-white/10'}"
 					>
 						Direct to friends
 					</button>
@@ -188,14 +188,14 @@
 			<!-- Direct recipients -->
 			{#if visibilityType === 'direct' && friends.data && friends.data.length > 0}
 				<div>
-					<p class="text-sm text-stone-500 mb-2">Send to</p>
+					<p class="text-sm text-white/50 mb-2">Send to</p>
 					<div class="max-h-32 overflow-y-auto space-y-1">
 						{#each friends.data as friend}
 							<button
 								onclick={() => toggleRecipient(friend.uuid)}
-								class="w-full text-left px-3 py-2 rounded-lg text-sm transition cursor-pointer flex items-center gap-2 {selectedRecipients.has(friend.uuid) ? 'bg-teal-50 text-teal-700' : 'text-stone-700 hover:bg-stone-50'}"
+								class="w-full text-left px-3 py-2 rounded-lg text-sm transition cursor-pointer flex items-center gap-2 {selectedRecipients.has(friend.uuid) ? 'bg-teal-500/15 text-teal-400' : 'text-white/70 hover:bg-white/10'}"
 							>
-								<span class="w-5 h-5 rounded border flex items-center justify-center text-xs {selectedRecipients.has(friend.uuid) ? 'bg-teal-500 border-teal-500 text-white' : 'border-stone-300'}">
+								<span class="w-5 h-5 rounded border flex items-center justify-center text-xs {selectedRecipients.has(friend.uuid) ? 'bg-teal-500 border-teal-500 text-white' : 'border-white/20'}">
 									{#if selectedRecipients.has(friend.uuid)}✓{/if}
 								</span>
 								{friend.displayName}
@@ -206,7 +206,7 @@
 			{/if}
 
 			{#if error}
-				<p class="text-xs text-red-500">{error}</p>
+				<p class="text-xs text-red-400">{error}</p>
 			{/if}
 
 			<button

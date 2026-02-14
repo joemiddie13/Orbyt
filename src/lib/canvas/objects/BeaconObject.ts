@@ -45,6 +45,7 @@ export interface BeaconObjectOptions {
 export class BeaconObject {
 	container: Container;
 	objectId?: string;
+	private outerGlow: Graphics;
 	private glowRing: Graphics;
 	private pulseTween: gsap.core.Tween | null = null;
 	private isExpired: boolean;
@@ -61,7 +62,12 @@ export class BeaconObject {
 		this.container.eventMode = 'static';
 		this.container.cursor = (options.editable !== false) ? 'pointer' : 'default';
 
-		// Glow ring (pulse animation target)
+		// Outer diffuse glow (wider, more transparent)
+		this.outerGlow = new Graphics();
+		this.drawOuterGlow(baseColor);
+		this.container.addChild(this.outerGlow);
+
+		// Inner glow ring (pulse animation target)
 		this.glowRing = new Graphics();
 		this.drawGlowRing(baseColor);
 		this.container.addChild(this.glowRing);
@@ -78,7 +84,7 @@ export class BeaconObject {
 
 		// Title
 		const titleStyle = new TextStyle({
-			fontFamily: 'system-ui, -apple-system, sans-serif',
+			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
 			fontSize: 15,
 			fontWeight: 'bold',
 			fill: 0xffffff,
@@ -102,7 +108,7 @@ export class BeaconObject {
 		// Time display
 		const timeStr = this.formatTimeRange(content.startTime, content.endTime);
 		const timeStyle = new TextStyle({
-			fontFamily: 'system-ui, -apple-system, sans-serif',
+			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
 			fontSize: 12,
 			fill: 0xffffff,
 			wordWrap: true,
@@ -117,7 +123,7 @@ export class BeaconObject {
 		// Location if present
 		if (content.locationAddress) {
 			const locStyle = new TextStyle({
-				fontFamily: 'system-ui, -apple-system, sans-serif',
+				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
 				fontSize: 11,
 				fill: 0xffffff,
 				wordWrap: true,
@@ -133,7 +139,7 @@ export class BeaconObject {
 		// "From [username]" for direct beacons
 		if (isDirect && content.fromUsername) {
 			const fromStyle = new TextStyle({
-				fontFamily: 'system-ui, -apple-system, sans-serif',
+				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
 				fontSize: 11,
 				fill: 0xffffff,
 			});
@@ -148,7 +154,7 @@ export class BeaconObject {
 		if (this.isExpired) {
 			this.container.alpha = 0.3;
 			const expStyle = new TextStyle({
-				fontFamily: 'system-ui, -apple-system, sans-serif',
+				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
 				fontSize: 13,
 				fontWeight: 'bold',
 				fill: 0xffffff,
@@ -208,30 +214,57 @@ export class BeaconObject {
 		}
 	}
 
-	/** Animated glow ring that pulses */
+	/** Outer diffuse glow — wide, soft ambient light */
+	private drawOuterGlow(color: number) {
+		this.outerGlow.clear();
+		const h = this.calculateHeight({ title: '', startTime: 0, endTime: 0, visibilityType: 'canvas' });
+		this.outerGlow.roundRect(-12, -12, BEACON_WIDTH + 24, h + 24, CORNER_RADIUS + 8);
+		this.outerGlow.fill({ color, alpha: 0.08 });
+	}
+
+	/** Inner glow ring that pulses */
 	private drawGlowRing(color: number) {
 		this.glowRing.clear();
-		this.glowRing.roundRect(-6, -6, BEACON_WIDTH + 12, this.calculateHeight({
-			title: '', startTime: 0, endTime: 0,
-			visibilityType: 'canvas',
-		}) + 12, CORNER_RADIUS + 4);
+		const h = this.calculateHeight({ title: '', startTime: 0, endTime: 0, visibilityType: 'canvas' });
+		this.glowRing.roundRect(-6, -6, BEACON_WIDTH + 12, h + 12, CORNER_RADIUS + 4);
 		this.glowRing.fill({ color, alpha: 0.2 });
 	}
 
 	private startPulse() {
 		this.glowRing.alpha = 0.2;
 		this.glowRing.scale.set(1.0);
+		this.outerGlow.alpha = 0.08;
+		this.outerGlow.scale.set(1.0);
+
+		// Inner ring — pulse alpha + scale
 		this.pulseTween = gsap.to(this.glowRing, {
 			alpha: 0.5,
-			duration: 1.5,
+			duration: 2.0,
 			ease: 'sine.inOut',
 			repeat: -1,
 			yoyo: true,
 		});
 		gsap.to(this.glowRing.scale, {
-			x: 1.08,
-			y: 1.08,
-			duration: 1.5,
+			x: 1.12,
+			y: 1.12,
+			duration: 2.0,
+			ease: 'sine.inOut',
+			repeat: -1,
+			yoyo: true,
+		});
+
+		// Outer ring — slower, subtler breathing
+		gsap.to(this.outerGlow, {
+			alpha: 0.14,
+			duration: 2.5,
+			ease: 'sine.inOut',
+			repeat: -1,
+			yoyo: true,
+		});
+		gsap.to(this.outerGlow.scale, {
+			x: 1.06,
+			y: 1.06,
+			duration: 2.5,
 			ease: 'sine.inOut',
 			repeat: -1,
 			yoyo: true,
@@ -241,8 +274,11 @@ export class BeaconObject {
 	stopPulse() {
 		gsap.killTweensOf(this.glowRing);
 		gsap.killTweensOf(this.glowRing.scale);
+		gsap.killTweensOf(this.outerGlow);
+		gsap.killTweensOf(this.outerGlow.scale);
 		this.pulseTween = null;
 		this.glowRing.alpha = 0.1;
+		this.outerGlow.alpha = 0.04;
 	}
 
 	setExpired() {

@@ -107,7 +107,7 @@ export class TextBlock {
 
 		// HTMLTextStyle with tagStyles for rich text rendering
 		this.style = new HTMLTextStyle({
-			fontFamily: 'system-ui, -apple-system, sans-serif',
+			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
 			fontSize: 16,
 			fill: 0x2d2d2d,
 			wordWrap: true,

@@ -20,7 +20,7 @@
 	onclick={onClose}
 >
 	<div
-		class="absolute top-16 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-2xl border border-stone-200 w-64 overflow-hidden"
+		class="absolute top-16 left-1/2 -translate-x-1/2 glass-panel rounded-xl w-64 overflow-hidden"
 		onclick={(e) => e.stopPropagation()}
 	>
 		<div class="p-2">
@@ -28,7 +28,7 @@
 				{#each canvases as canvas}
 					<button
 						onclick={() => onSelect(canvas._id, canvas.name)}
-						class="w-full text-left px-3 py-2 rounded-lg text-sm transition cursor-pointer flex items-center gap-2 {canvas._id === activeCanvasId ? 'bg-amber-50 text-amber-700' : 'text-stone-700 hover:bg-stone-50'}"
+						class="w-full text-left px-3 py-2 rounded-lg text-sm transition cursor-pointer flex items-center gap-2 {canvas._id === activeCanvasId ? 'bg-amber-500/15 text-amber-400' : 'text-white/70 hover:bg-white/10'}"
 					>
 						{#if canvas.type === 'personal'}
 							<span class="text-xs">🏠</span>
@@ -37,16 +37,16 @@
 						{/if}
 						<span class="flex-1 truncate">{canvas.name}</span>
 						{#if canvas.role !== 'owner'}
-							<span class="text-xs text-stone-400">{canvas.role}</span>
+							<span class="text-xs text-white/40">{canvas.role}</span>
 						{/if}
 					</button>
 				{/each}
 			{/if}
 		</div>
-		<div class="border-t border-stone-100 p-2">
+		<div class="border-t border-white/[0.08] p-2">
 			<button
 				onclick={onCreateNew}
-				class="w-full text-left px-3 py-2 rounded-lg text-sm text-amber-600 hover:bg-amber-50 transition cursor-pointer"
+				class="w-full text-left px-3 py-2 rounded-lg text-sm text-amber-400 hover:bg-amber-500/15 transition cursor-pointer"
 			>
 				+ New shared canvas
 			</button>

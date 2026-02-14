@@ -24,14 +24,14 @@
 	onclick={onClose}
 >
 	<div
-		class="absolute bg-white rounded-2xl shadow-2xl border border-stone-200 p-2 flex gap-1 flex-wrap"
+		class="absolute glass-panel rounded-2xl p-2 flex gap-1 flex-wrap"
 		style="left: {left}px; top: {top}px; width: 208px;"
 		onclick={(e) => e.stopPropagation()}
 	>
 		{#each STICKER_TYPES as type}
 			<button
 				onclick={() => onSelect(type)}
-				class="w-10 h-10 rounded-xl hover:bg-stone-100 active:bg-stone-200 transition cursor-pointer flex items-center justify-center text-xl"
+				class="w-10 h-10 rounded-xl hover:bg-white/10 active:bg-white/15 transition cursor-pointer flex items-center justify-center text-xl"
 				title={type}
 			>
 				{getStickerEmoji(type)}

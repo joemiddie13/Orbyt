@@ -2,6 +2,7 @@ import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
 import './gsapInit'; // Ensure GSAP + PixiPlugin registered before any object creation
 import { gsap } from './gsapInit';
 import { PanZoom } from './interactions/PanZoom';
+import { StarField } from './StarField';
 import { TextBlock } from './objects/TextBlock';
 import { BeaconObject, type BeaconContent } from './objects/BeaconObject';
 import { StickerReaction, type StickerData } from './objects/StickerReaction';
@@ -48,6 +49,7 @@ export class CanvasRenderer {
 	private canvasWidth: number;
 	private canvasHeight: number;
 	private panZoom!: PanZoom;
+	private starField!: StarField;
 
 	/** Map from Convex _id → visual object for reconciliation */
 	private objects = new Map<string, TextBlock | BeaconObject | PhotoObject>();
@@ -116,13 +118,15 @@ export class CanvasRenderer {
 		});
 
 		container.appendChild(this.app.canvas);
+		this.starField = new StarField(this.app.stage);
 		this.app.stage.addChild(this.world);
 		this.drawBounds();
 		this.panZoom = new PanZoom(this.app, this.world, this.canvasWidth, this.canvasHeight);
 
 		// GSAP runs its own rAF loop — no manual update needed.
-		// Ticker handles interpolation + cursor staleness only.
+		// Ticker handles interpolation, cursor staleness, and star parallax.
 		this.app.ticker.add(() => {
+			this.starField.update(this.world.x, this.world.y);
 			this.interpolateRemotes();
 			this.updateCursorStaleness();
 		});
@@ -150,6 +154,7 @@ export class CanvasRenderer {
 			if (!incomingIds.has(id)) {
 				if (obj instanceof BeaconObject) obj.destroy();
 				if (obj instanceof TextBlock) obj.destroy();
+				if (obj instanceof PhotoObject) obj.destroy();
 				this.world.removeChild(obj.container);
 				obj.container.destroy({ children: true });
 				this.objects.delete(id);
@@ -232,6 +237,7 @@ export class CanvasRenderer {
 					objectId: obj._id,
 					editable: this.editable,
 					animate: shouldAnimate,
+					onDragStart: (id) => this.onObjectDragStart?.(id),
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
 					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
 					onTap: (id) => this.onPhotoTapped?.(id),
@@ -415,7 +421,7 @@ export class CanvasRenderer {
 	/** Play drag-lift animation on a remote object (WebRTC drag-start) */
 	animateRemoteDragLift(objectId: string) {
 		const obj = this.objects.get(objectId);
-		if (obj instanceof TextBlock) {
+		if (obj instanceof TextBlock || obj instanceof PhotoObject) {
 			obj.animateDragLift();
 		}
 	}
@@ -423,7 +429,7 @@ export class CanvasRenderer {
 	/** Play drag-drop animation on a remote object (WebRTC drag-end) */
 	animateRemoteDragDrop(objectId: string) {
 		const obj = this.objects.get(objectId);
-		if (obj instanceof TextBlock) {
+		if (obj instanceof TextBlock || obj instanceof PhotoObject) {
 			obj.animateDragDrop();
 		}
 	}
@@ -448,7 +454,7 @@ export class CanvasRenderer {
 
 		// Username label pill
 		const style = new TextStyle({
-			fontFamily: 'system-ui, -apple-system, sans-serif',
+			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
 			fontSize: 11,
 			fill: 0xffffff,
 		});
@@ -533,16 +539,38 @@ export class CanvasRenderer {
 	}
 
 	private drawBounds() {
-		// Filled canvas area — stands out against the space background
+		// Outer warm glow halo — ambient campfire light
+		const outerGlow = new Graphics();
+		outerGlow.roundRect(-20, -20, this.canvasWidth + 40, this.canvasHeight + 40, 28);
+		outerGlow.fill({ color: 0xF59E0B, alpha: 0.04 });
+		this.world.addChild(outerGlow);
+
+		// Inner warm glow
+		const innerGlow = new Graphics();
+		innerGlow.roundRect(-10, -10, this.canvasWidth + 20, this.canvasHeight + 20, 22);
+		innerGlow.fill({ color: 0xF59E0B, alpha: 0.06 });
+		this.world.addChild(innerGlow);
+
+		// Filled canvas area — warm parchment surface
 		const fill = new Graphics();
 		fill.roundRect(0, 0, this.canvasWidth, this.canvasHeight, 16);
 		fill.fill(CANVAS_COLOR);
-		fill.stroke({ width: 2, color: 0xc4b5a5 });
+		fill.stroke({ width: 1.5, color: 0xBFA98A, alpha: 0.6 });
 		this.world.addChild(fill);
+
+		// Subtle breathing animation on outer glow
+		gsap.to(outerGlow, {
+			alpha: 0.07,
+			duration: 4,
+			ease: 'sine.inOut',
+			repeat: -1,
+			yoyo: true,
+		});
 	}
 
 	destroy() {
 		this.removeAllRemoteCursors();
+		this.starField.destroy();
 		this.app.destroy(true, { children: true });
 	}
 }

@@ -7,9 +7,9 @@ const isDev = process.env.NODE_ENV !== "production";
 const csp = [
 	"default-src 'self'",
 	isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self'",
-	"style-src 'self' 'unsafe-inline'",
+	"style-src 'self' 'unsafe-inline' https://api.fontshare.com",
 	"img-src 'self' data: blob: https://*.convex.cloud",
-	"font-src 'self'",
+	"font-src 'self' https://cdn.fontshare.com",
 	`connect-src 'self' wss://*.convex.cloud https://*.convex.cloud${isDev ? " ws://localhost:* http://localhost:*" : ""}`,
 	"worker-src 'self' blob:",
 ].join("; ");

@@ -50,16 +50,16 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div
-	class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+	class="fixed inset-0 z-50 flex items-center justify-center glass-backdrop"
 	onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
 >
-	<div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+	<div class="glass-panel rounded-2xl w-full max-w-sm mx-4 overflow-hidden">
 		<div class="p-6">
 			<div class="flex items-center justify-between mb-5">
-				<h2 class="text-lg font-semibold text-stone-800">New Shared Canvas</h2>
+				<h2 class="text-lg font-semibold text-white">New Shared Canvas</h2>
 				<button
 					onclick={onClose}
-					class="text-stone-400 hover:text-stone-600 transition cursor-pointer"
+					class="text-white/40 hover:text-white/70 transition cursor-pointer"
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -68,42 +68,42 @@
 			</div>
 
 			<div class="mb-4">
-				<label class="text-sm text-stone-500 mb-1 block" for="canvas-name">Name</label>
+				<label class="text-sm text-white/50 mb-1 block" for="canvas-name">Name</label>
 				<input
 					id="canvas-name"
 					type="text"
 					bind:value={canvasName}
 					placeholder="Weekend hangout, Game night..."
 					maxlength="100"
-					class="w-full px-3 py-2 bg-stone-100 rounded-xl text-sm text-stone-800 placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-amber-400"
+					class="w-full px-3 py-2 rounded-xl glass-input text-sm"
 				/>
 			</div>
 
 			<!-- Friend selector -->
 			{#if friends.data && friends.data.length > 0}
 				<div class="mb-4">
-					<p class="text-sm text-stone-500 mb-2">Invite friends</p>
+					<p class="text-sm text-white/50 mb-2">Invite friends</p>
 					<div class="max-h-40 overflow-y-auto space-y-1">
 						{#each friends.data as friend}
 							<button
 								onclick={() => toggleFriend(friend.uuid)}
-								class="w-full text-left px-3 py-2 rounded-lg text-sm transition cursor-pointer flex items-center gap-2 {selectedFriends.has(friend.uuid) ? 'bg-amber-50 text-amber-700' : 'text-stone-700 hover:bg-stone-50'}"
+								class="w-full text-left px-3 py-2 rounded-lg text-sm transition cursor-pointer flex items-center gap-2 {selectedFriends.has(friend.uuid) ? 'bg-amber-500/15 text-amber-400' : 'text-white/70 hover:bg-white/10'}"
 							>
-								<span class="w-5 h-5 rounded border flex items-center justify-center text-xs {selectedFriends.has(friend.uuid) ? 'bg-amber-500 border-amber-500 text-white' : 'border-stone-300'}">
+								<span class="w-5 h-5 rounded border flex items-center justify-center text-xs {selectedFriends.has(friend.uuid) ? 'bg-amber-500 border-amber-500 text-white' : 'border-white/20'}">
 									{#if selectedFriends.has(friend.uuid)}✓{/if}
 								</span>
 								{friend.displayName}
-								<span class="text-stone-400 text-xs">@{friend.username}</span>
+								<span class="text-white/40 text-xs">@{friend.username}</span>
 							</button>
 						{/each}
 					</div>
 				</div>
 			{:else if !friends.isLoading}
-				<p class="text-sm text-stone-400 mb-4">Add some friends first to invite them to a shared canvas.</p>
+				<p class="text-sm text-white/40 mb-4">Add some friends first to invite them to a shared canvas.</p>
 			{/if}
 
 			{#if error}
-				<p class="text-xs text-red-500 mb-3">{error}</p>
+				<p class="text-xs text-red-400 mb-3">{error}</p>
 			{/if}
 
 			<button

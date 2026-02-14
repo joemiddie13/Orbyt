@@ -51,16 +51,16 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div
-	class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+	class="fixed inset-0 z-50 flex items-center justify-center glass-backdrop"
 	onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
 >
-	<div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+	<div class="glass-panel rounded-2xl w-full max-w-sm mx-4 overflow-hidden">
 		<div class="p-6">
 			<div class="flex items-center justify-between mb-5">
-				<h2 class="text-lg font-semibold text-stone-800">Friends</h2>
+				<h2 class="text-lg font-semibold text-white">Friends</h2>
 				<button
 					onclick={onClose}
-					class="text-stone-400 hover:text-stone-600 transition cursor-pointer"
+					class="text-white/40 hover:text-white/70 transition cursor-pointer"
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -70,31 +70,31 @@
 
 			<!-- Your friend code -->
 			<div class="mb-6">
-				<p class="text-sm text-stone-500 mb-2">Your friend code</p>
+				<p class="text-sm text-white/50 mb-2">Your friend code</p>
 				<div class="flex items-center gap-2">
-					<code class="flex-1 px-3 py-2 bg-stone-100 rounded-xl text-center font-mono text-lg tracking-wider text-stone-800">
+					<code class="flex-1 px-3 py-2 bg-white/[0.06] border border-white/10 rounded-xl text-center font-mono text-lg tracking-wider text-white">
 						{displayCode || '...'}
 					</code>
 					<button
 						onclick={copyCode}
-						class="px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-sm text-stone-600 transition cursor-pointer"
+						class="px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/10 text-sm text-white/70 transition cursor-pointer"
 					>
 						{copied ? 'Copied!' : 'Copy'}
 					</button>
 				</div>
-				<p class="text-xs text-stone-400 mt-1">Share this with friends so they can connect with you</p>
+				<p class="text-xs text-white/40 mt-1">Share this with friends so they can connect with you</p>
 			</div>
 
 			<!-- Enter a friend's code -->
 			<div>
-				<p class="text-sm text-stone-500 mb-2">Add a friend</p>
+				<p class="text-sm text-white/50 mb-2">Add a friend</p>
 				<div class="flex items-center gap-2">
 					<input
 						type="text"
 						bind:value={inputCode}
 						placeholder="Enter friend code"
 						maxlength="10"
-						class="flex-1 px-3 py-2 bg-stone-100 rounded-xl text-sm text-stone-800 placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-amber-400"
+						class="flex-1 px-3 py-2 rounded-xl glass-input text-sm"
 						onkeydown={(e) => { if (e.key === 'Enter') sendRequest(); }}
 					/>
 					<button
@@ -106,7 +106,7 @@
 					</button>
 				</div>
 				{#if message}
-					<p class="text-xs mt-2 {message.type === 'success' ? 'text-emerald-600' : 'text-red-500'}">
+					<p class="text-xs mt-2 {message.type === 'success' ? 'text-emerald-400' : 'text-red-400'}">
 						{message.text}
 					</p>
 				{/if}

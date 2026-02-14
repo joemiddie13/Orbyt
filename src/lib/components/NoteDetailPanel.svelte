@@ -30,11 +30,11 @@
 
 	/** Color swatches for the picker */
 	const COLOR_OPTIONS: Array<{ value: number; name: string; bg: string; dot: string; ring: string }> = [
-		{ value: 0xfff9c4, name: 'Yellow', bg: 'bg-yellow-100', dot: 'bg-yellow-300', ring: 'ring-yellow-400' },
-		{ value: 0xc8e6c9, name: 'Green', bg: 'bg-green-100', dot: 'bg-green-300', ring: 'ring-green-400' },
-		{ value: 0xbbdefb, name: 'Blue', bg: 'bg-blue-100', dot: 'bg-blue-300', ring: 'ring-blue-400' },
-		{ value: 0xf8bbd0, name: 'Pink', bg: 'bg-pink-100', dot: 'bg-pink-300', ring: 'ring-pink-400' },
-		{ value: 0xffe0b2, name: 'Orange', bg: 'bg-orange-100', dot: 'bg-orange-300', ring: 'ring-orange-400' },
+		{ value: 0xfff9c4, name: 'Yellow', bg: 'bg-yellow-400/10', dot: 'bg-yellow-400', ring: 'ring-yellow-400' },
+		{ value: 0xc8e6c9, name: 'Green', bg: 'bg-green-400/10', dot: 'bg-green-400', ring: 'ring-green-400' },
+		{ value: 0xbbdefb, name: 'Blue', bg: 'bg-blue-400/10', dot: 'bg-blue-400', ring: 'ring-blue-400' },
+		{ value: 0xf8bbd0, name: 'Pink', bg: 'bg-pink-400/10', dot: 'bg-pink-400', ring: 'ring-pink-400' },
+		{ value: 0xffe0b2, name: 'Orange', bg: 'bg-orange-400/10', dot: 'bg-orange-400', ring: 'ring-orange-400' },
 	];
 
 	const activeColor = $derived(COLOR_OPTIONS.find(c => c.value === editColor) ?? COLOR_OPTIONS[0]);
@@ -78,20 +78,20 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div
-	class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+	class="fixed inset-0 z-50 flex items-end sm:items-center justify-center glass-backdrop"
 	onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
 >
-	<div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md mx-0 sm:mx-4 overflow-hidden max-h-[80vh] flex flex-col">
+	<div class="glass-panel rounded-t-2xl sm:rounded-2xl w-full max-w-md mx-0 sm:mx-4 overflow-hidden max-h-[80vh] flex flex-col">
 		<!-- Header -->
 		<div class="p-6 pb-3 flex-shrink-0 {activeColor.bg}">
 			<div class="flex items-center justify-between mb-2">
 				<div class="flex items-center gap-2">
 					<span class="w-3 h-3 rounded-full {activeColor.dot}"></span>
-					<h2 class="text-lg font-bold text-stone-800">{activeColor.name} Note</h2>
+					<h2 class="text-lg font-bold text-white">{activeColor.name} Note</h2>
 				</div>
 				<button
 					onclick={onClose}
-					class="text-stone-400 hover:text-stone-600 transition cursor-pointer flex-shrink-0"
+					class="text-white/40 hover:text-white/70 transition cursor-pointer flex-shrink-0"
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -106,7 +106,7 @@
 						<button
 							type="button"
 							onclick={() => { editColor = color.value; }}
-							class="w-7 h-7 rounded-full transition cursor-pointer {color.dot} {editColor === color.value ? 'ring-2 ring-offset-2 ' + color.ring : 'hover:scale-110'}"
+							class="w-7 h-7 rounded-full transition cursor-pointer {color.dot} {editColor === color.value ? 'ring-2 ring-offset-2 ring-offset-transparent ' + color.ring : 'hover:scale-110'}"
 							title={color.name}
 						></button>
 					{/each}
@@ -115,7 +115,7 @@
 		</div>
 
 		<!-- Content -->
-		<div class="flex-1 overflow-y-auto px-6 py-4">
+		<div class="flex-1 overflow-y-auto px-6 py-4 text-white/80">
 			{#if isOwner}
 				<RichTextEditor
 					content={note.content.text}
@@ -132,7 +132,7 @@
 
 		<!-- Actions -->
 		{#if isOwner}
-			<div class="px-6 py-4 flex gap-2 flex-shrink-0 border-t border-stone-100">
+			<div class="px-6 py-4 flex gap-2 flex-shrink-0 border-t border-white/[0.08]">
 				{#if isModified}
 					<button
 						onclick={save}
@@ -145,7 +145,7 @@
 				<button
 					onclick={deleteNote}
 					disabled={deleting}
-					class="py-2.5 px-4 rounded-xl text-sm font-medium transition cursor-pointer disabled:opacity-50 bg-red-50 text-red-600 hover:bg-red-100"
+					class="py-2.5 px-4 rounded-xl text-sm font-medium transition cursor-pointer disabled:opacity-50 bg-red-500/10 text-red-400 hover:bg-red-500/20"
 				>
 					{deleting ? 'Deleting...' : 'Delete'}
 				</button>
