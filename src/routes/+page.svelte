@@ -636,6 +636,13 @@
 		beacon={selectedBeacon}
 		userUuid={currentUser.user.uuid}
 		onClose={() => { selectedBeacon = null; }}
+		onNavigateToUser={(userId, displayName) => {
+			const canvas = accessibleCanvases.data?.find((c: any) => c.ownerId === userId && c.type === 'personal');
+			if (canvas) {
+				selectedBeacon = null;
+				switchCanvas(canvas._id, canvas.name);
+			}
+		}}
 	/>
 {/if}
 

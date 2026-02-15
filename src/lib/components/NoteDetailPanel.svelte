@@ -137,7 +137,7 @@
 					<button
 						onclick={save}
 						disabled={saving || isContentEmpty(editText)}
-						class="flex-1 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer disabled:opacity-50 bg-amber-500 text-white hover:bg-amber-600"
+						class="lego-btn lego-amber flex-1"
 					>
 						{saving ? 'Saving...' : 'Save'}
 					</button>
@@ -145,7 +145,7 @@
 				<button
 					onclick={deleteNote}
 					disabled={deleting}
-					class="py-2.5 px-4 rounded-xl text-sm font-medium transition cursor-pointer disabled:opacity-50 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+					class="lego-btn lego-red"
 				>
 					{deleting ? 'Deleting...' : 'Delete'}
 				</button>

@@ -42,16 +42,18 @@
 </script>
 
 {#if editable && editor}
-	<div class="flex flex-wrap gap-1 mb-2 p-1 rounded-lg bg-stone-100 border border-stone-200">
+	<div class="flex flex-wrap gap-1 mb-2 p-1.5 rounded-lg bg-stone-100 border border-stone-200">
 		<button
 			type="button"
 			onclick={() => editor?.chain().focus().toggleBold().run()}
-			class="px-2 py-1 rounded text-xs font-bold transition cursor-pointer {editor.isActive('bold') ? 'bg-amber-400 text-white' : 'text-stone-600 hover:bg-stone-200'}"
+			class="lego-toggle {editor.isActive('bold') ? 'active' : ''}"
+			style="font-style: normal;"
 		>B</button>
 		<button
 			type="button"
 			onclick={() => editor?.chain().focus().toggleItalic().run()}
-			class="px-2 py-1 rounded text-xs italic transition cursor-pointer {editor.isActive('italic') ? 'bg-amber-400 text-white' : 'text-stone-600 hover:bg-stone-200'}"
+			class="lego-toggle {editor.isActive('italic') ? 'active' : ''}"
+			style="font-style: italic;"
 		>I</button>
 
 		<span class="w-px h-5 bg-stone-300 self-center mx-0.5"></span>
@@ -59,17 +61,17 @@
 		<button
 			type="button"
 			onclick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-			class="px-2 py-1 rounded text-xs font-bold transition cursor-pointer {editor.isActive('heading', { level: 1 }) ? 'bg-amber-400 text-white' : 'text-stone-600 hover:bg-stone-200'}"
+			class="lego-toggle {editor.isActive('heading', { level: 1 }) ? 'active' : ''}"
 		>H1</button>
 		<button
 			type="button"
 			onclick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-			class="px-2 py-1 rounded text-xs font-bold transition cursor-pointer {editor.isActive('heading', { level: 2 }) ? 'bg-amber-400 text-white' : 'text-stone-600 hover:bg-stone-200'}"
+			class="lego-toggle {editor.isActive('heading', { level: 2 }) ? 'active' : ''}"
 		>H2</button>
 		<button
 			type="button"
 			onclick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
-			class="px-2 py-1 rounded text-xs font-bold transition cursor-pointer {editor.isActive('heading', { level: 3 }) ? 'bg-amber-400 text-white' : 'text-stone-600 hover:bg-stone-200'}"
+			class="lego-toggle {editor.isActive('heading', { level: 3 }) ? 'active' : ''}"
 		>H3</button>
 
 		<span class="w-px h-5 bg-stone-300 self-center mx-0.5"></span>
@@ -77,7 +79,7 @@
 		<button
 			type="button"
 			onclick={() => editor?.chain().focus().toggleBulletList().run()}
-			class="px-2 py-1 rounded text-xs transition cursor-pointer {editor.isActive('bulletList') ? 'bg-amber-400 text-white' : 'text-stone-600 hover:bg-stone-200'}"
+			class="lego-toggle {editor.isActive('bulletList') ? 'active' : ''}"
 		>
 			<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 				<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/>
@@ -87,7 +89,7 @@
 		<button
 			type="button"
 			onclick={() => editor?.chain().focus().toggleOrderedList().run()}
-			class="px-2 py-1 rounded text-xs transition cursor-pointer {editor.isActive('orderedList') ? 'bg-amber-400 text-white' : 'text-stone-600 hover:bg-stone-200'}"
+			class="lego-toggle {editor.isActive('orderedList') ? 'active' : ''}"
 		>
 			<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 				<line x1="10" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="18" x2="20" y2="18"/>

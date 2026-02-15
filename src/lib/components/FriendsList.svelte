@@ -68,14 +68,14 @@
 								<button
 									onclick={() => accept(req.friendshipId)}
 									disabled={respondingTo === req.friendshipId}
-									class="px-3 py-1 rounded-lg bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 disabled:opacity-50 transition cursor-pointer"
+									class="lego-btn lego-btn-sm lego-emerald"
 								>
 									Accept
 								</button>
 								<button
 									onclick={() => decline(req.friendshipId)}
 									disabled={respondingTo === req.friendshipId}
-									class="px-3 py-1 rounded-lg bg-white/[0.06] text-white/70 text-xs font-medium hover:bg-white/10 disabled:opacity-50 transition cursor-pointer"
+									class="lego-btn lego-btn-sm lego-neutral"
 								>
 									Decline
 								</button>

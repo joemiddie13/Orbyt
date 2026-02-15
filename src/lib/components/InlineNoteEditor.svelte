@@ -126,14 +126,12 @@
 			<button
 				type="button"
 				onclick={() => editor?.chain().focus().toggleBold().run()}
-				class="toolbar-btn"
-				class:active={editor.isActive('bold')}
+				class="lego-toggle-dark {editor.isActive('bold') ? 'active' : ''}"
 			><strong>B</strong></button>
 			<button
 				type="button"
 				onclick={() => editor?.chain().focus().toggleItalic().run()}
-				class="toolbar-btn"
-				class:active={editor.isActive('italic')}
+				class="lego-toggle-dark {editor.isActive('italic') ? 'active' : ''}"
 			><em>I</em></button>
 
 			<span class="toolbar-divider"></span>
@@ -141,20 +139,17 @@
 			<button
 				type="button"
 				onclick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-				class="toolbar-btn"
-				class:active={editor.isActive('heading', { level: 1 })}
+				class="lego-toggle-dark {editor.isActive('heading', { level: 1 }) ? 'active' : ''}"
 			>H1</button>
 			<button
 				type="button"
 				onclick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-				class="toolbar-btn"
-				class:active={editor.isActive('heading', { level: 2 })}
+				class="lego-toggle-dark {editor.isActive('heading', { level: 2 }) ? 'active' : ''}"
 			>H2</button>
 			<button
 				type="button"
 				onclick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
-				class="toolbar-btn"
-				class:active={editor.isActive('heading', { level: 3 })}
+				class="lego-toggle-dark {editor.isActive('heading', { level: 3 }) ? 'active' : ''}"
 			>H3</button>
 
 			<span class="toolbar-divider"></span>
@@ -162,8 +157,7 @@
 			<button
 				type="button"
 				onclick={() => editor?.chain().focus().toggleBulletList().run()}
-				class="toolbar-btn"
-				class:active={editor.isActive('bulletList')}
+				class="lego-toggle-dark {editor.isActive('bulletList') ? 'active' : ''}"
 				title="Bullet list"
 			>
 				<svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -174,8 +168,7 @@
 			<button
 				type="button"
 				onclick={() => editor?.chain().focus().toggleOrderedList().run()}
-				class="toolbar-btn"
-				class:active={editor.isActive('orderedList')}
+				class="lego-toggle-dark {editor.isActive('orderedList') ? 'active' : ''}"
 				title="Numbered list"
 			>
 				<svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -191,7 +184,7 @@
 		<button
 			type="button"
 			onclick={(e) => { e.stopPropagation(); handleDelete(); }}
-			class="toolbar-btn delete-btn"
+			class="lego-toggle-dark delete"
 			title="Delete note"
 		>
 			<svg class="toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -265,39 +258,6 @@
 		height: 18px;
 		background: #57534e;
 		margin: 0 3px;
-	}
-
-	.toolbar-btn {
-		padding: 2px 6px;
-		border-radius: 4px;
-		font-size: 12px;
-		font-weight: 600;
-		color: #d6d3d1;
-		cursor: pointer;
-		transition: background 0.1s;
-		border: none;
-		background: none;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.toolbar-btn:hover {
-		background: #44403c;
-	}
-
-	.toolbar-btn.active {
-		background: #f59e0b;
-		color: white;
-	}
-
-	.toolbar-btn.delete-btn {
-		color: #ef4444;
-	}
-
-	.toolbar-btn.delete-btn:hover {
-		background: #7f1d1d;
-		color: #fca5a5;
 	}
 
 	.toolbar-icon {

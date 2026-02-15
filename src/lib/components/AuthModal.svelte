@@ -93,7 +93,7 @@
 			<button
 				type="submit"
 				disabled={isSubmitting}
-				class="py-3 rounded-xl bg-amber-500 text-white font-semibold hover:bg-amber-600 active:bg-amber-700 disabled:opacity-50 transition cursor-pointer campfire-btn"
+				class="lego-btn lego-btn-full lego-amber"
 			>
 				{#if isSubmitting}
 					...

@@ -9,6 +9,7 @@
 		beacon,
 		userUuid,
 		onClose,
+		onNavigateToUser,
 	}: {
 		beacon: {
 			_id: string;
@@ -24,6 +25,7 @@
 		};
 		userUuid: string;
 		onClose: () => void;
+		onNavigateToUser?: (userId: string, displayName: string) => void;
 	} = $props();
 
 	const client = useConvexClient();
@@ -635,24 +637,21 @@
 				<button
 					onclick={() => myResponse?.status === 'joining' ? removeResponse() : respond('joining')}
 					disabled={responding}
-					class="response-btn emerald cursor-pointer"
-					class:active={myResponse?.status === 'joining'}
+					class="lego-btn lego-emerald flex-1 cursor-pointer {myResponse?.status === 'joining' ? 'active' : ''}"
 				>
 					{myResponse?.status === 'joining' ? "I'm in! \u2713" : "I'm in"}
 				</button>
 				<button
 					onclick={() => myResponse?.status === 'interested' ? removeResponse() : respond('interested')}
 					disabled={responding}
-					class="response-btn amber cursor-pointer"
-					class:active={myResponse?.status === 'interested'}
+					class="lego-btn lego-amber flex-1 cursor-pointer {myResponse?.status === 'interested' ? 'active' : ''}"
 				>
 					{myResponse?.status === 'interested' ? 'Interested \u2713' : 'Interested'}
 				</button>
 				<button
 					onclick={() => myResponse?.status === 'declined' ? removeResponse() : respond('declined')}
 					disabled={responding}
-					class="response-btn neutral cursor-pointer"
-					class:active={myResponse?.status === 'declined'}
+					class="lego-btn lego-neutral flex-1 cursor-pointer {myResponse?.status === 'declined' ? 'active' : ''}"
 				>
 					{myResponse?.status === 'declined' ? "Can't \u2713" : "Can't make it"}
 				</button>
@@ -664,7 +663,10 @@
 					<p class="text-xs font-medium text-emerald-400 uppercase tracking-wider mb-1.5" style="font-family: 'Satoshi', sans-serif;">Going</p>
 					<div class="flex flex-wrap gap-1.5">
 						{#each joining as person}
-							<span class="friend-chip going">{person.displayName}</span>
+							<button
+								class="lego-chip lego-chip-emerald cursor-pointer"
+								onclick={() => onNavigateToUser?.(person.userId, person.displayName)}
+							>{person.displayName}</button>
 						{/each}
 					</div>
 				</div>
@@ -675,7 +677,10 @@
 					<p class="text-xs font-medium text-amber-400 uppercase tracking-wider mb-1.5" style="font-family: 'Satoshi', sans-serif;">Interested</p>
 					<div class="flex flex-wrap gap-1.5">
 						{#each interested as person}
-							<span class="friend-chip interested">{person.displayName}</span>
+							<button
+								class="lego-chip lego-chip-amber cursor-pointer"
+								onclick={() => onNavigateToUser?.(person.userId, person.displayName)}
+							>{person.displayName}</button>
 						{/each}
 					</div>
 				</div>
@@ -719,158 +724,4 @@
 		text-shadow: 0 0 8px rgba(38, 166, 154, 0.3);
 	}
 
-	/* 3D Response Buttons — convex surface with depth */
-	.response-btn {
-		flex: 1;
-		padding: 0.6rem 0.5rem;
-		border-radius: 0.75rem;
-		font-weight: 600;
-		font-size: 0.8rem;
-		font-family: 'Satoshi', sans-serif;
-		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-		transform: translateY(0);
-		transition: all 0.15s ease;
-		will-change: transform, box-shadow;
-	}
-
-	/* Emerald — "I'm in" */
-	.response-btn.emerald {
-		background: linear-gradient(180deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%);
-		color: #6EE7B7;
-		border: 1px solid rgba(16, 185, 129, 0.2);
-		box-shadow:
-			0 2px 6px rgba(0, 0, 0, 0.2),
-			0 1px 2px rgba(0, 0, 0, 0.15),
-			inset 0 1px 0 rgba(255, 255, 255, 0.06);
-	}
-
-	.response-btn.emerald:hover:not(:disabled) {
-		background: linear-gradient(180deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%);
-		box-shadow:
-			0 4px 10px rgba(0, 0, 0, 0.25),
-			0 2px 4px rgba(0, 0, 0, 0.15),
-			inset 0 1px 0 rgba(255, 255, 255, 0.08);
-		transform: translateY(-1px);
-	}
-
-	.response-btn.emerald:active:not(:disabled) {
-		background: linear-gradient(180deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.12) 100%);
-		box-shadow:
-			0 1px 3px rgba(0, 0, 0, 0.2),
-			inset 0 2px 4px rgba(0, 0, 0, 0.1);
-		transform: translateY(1px);
-	}
-
-	.response-btn.emerald.active {
-		background: linear-gradient(180deg, #34D399 0%, #059669 100%);
-		color: white;
-		border-color: rgba(16, 185, 129, 0.5);
-		box-shadow:
-			0 4px 8px rgba(16, 185, 129, 0.3),
-			0 1px 3px rgba(0, 0, 0, 0.2),
-			inset 0 1px 0 rgba(255, 255, 255, 0.25);
-	}
-
-	/* Amber — "Interested" */
-	.response-btn.amber {
-		background: linear-gradient(180deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.08) 100%);
-		color: #FCD34D;
-		border: 1px solid rgba(245, 158, 11, 0.2);
-		box-shadow:
-			0 2px 6px rgba(0, 0, 0, 0.2),
-			0 1px 2px rgba(0, 0, 0, 0.15),
-			inset 0 1px 0 rgba(255, 255, 255, 0.06);
-	}
-
-	.response-btn.amber:hover:not(:disabled) {
-		background: linear-gradient(180deg, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.15) 100%);
-		box-shadow:
-			0 4px 10px rgba(0, 0, 0, 0.25),
-			0 2px 4px rgba(0, 0, 0, 0.15),
-			inset 0 1px 0 rgba(255, 255, 255, 0.08);
-		transform: translateY(-1px);
-	}
-
-	.response-btn.amber:active:not(:disabled) {
-		background: linear-gradient(180deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.12) 100%);
-		box-shadow:
-			0 1px 3px rgba(0, 0, 0, 0.2),
-			inset 0 2px 4px rgba(0, 0, 0, 0.1);
-		transform: translateY(1px);
-	}
-
-	.response-btn.amber.active {
-		background: linear-gradient(180deg, #FBBF24 0%, #D97706 100%);
-		color: white;
-		border-color: rgba(245, 158, 11, 0.5);
-		box-shadow:
-			0 4px 8px rgba(245, 158, 11, 0.3),
-			0 1px 3px rgba(0, 0, 0, 0.2),
-			inset 0 1px 0 rgba(255, 255, 255, 0.25);
-	}
-
-	/* Neutral — "Can't make it" */
-	.response-btn.neutral {
-		background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
-		color: rgba(255, 255, 255, 0.6);
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		text-shadow: none;
-		box-shadow:
-			0 2px 6px rgba(0, 0, 0, 0.2),
-			0 1px 2px rgba(0, 0, 0, 0.15),
-			inset 0 1px 0 rgba(255, 255, 255, 0.04);
-	}
-
-	.response-btn.neutral:hover:not(:disabled) {
-		background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%);
-		box-shadow:
-			0 4px 10px rgba(0, 0, 0, 0.25),
-			0 2px 4px rgba(0, 0, 0, 0.15),
-			inset 0 1px 0 rgba(255, 255, 255, 0.06);
-		transform: translateY(-1px);
-	}
-
-	.response-btn.neutral:active:not(:disabled) {
-		background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
-		box-shadow:
-			0 1px 3px rgba(0, 0, 0, 0.2),
-			inset 0 2px 4px rgba(0, 0, 0, 0.1);
-		transform: translateY(1px);
-	}
-
-	.response-btn.neutral.active {
-		background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%);
-		color: white;
-		border-color: rgba(255, 255, 255, 0.2);
-		box-shadow:
-			0 4px 8px rgba(0, 0, 0, 0.25),
-			0 1px 3px rgba(0, 0, 0, 0.2),
-			inset 0 1px 0 rgba(255, 255, 255, 0.1);
-	}
-
-	.response-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
-	/* Friend-chip attendee pills */
-	.friend-chip {
-		padding: 0.25rem 0.75rem;
-		border-radius: 9999px;
-		font-size: 0.8rem;
-		font-family: 'Satoshi', sans-serif;
-		transition: all 0.2s;
-	}
-
-	.friend-chip.going {
-		background: rgba(16, 185, 129, 0.12);
-		color: #6EE7B7;
-		border: 1px solid rgba(16, 185, 129, 0.2);
-	}
-
-	.friend-chip.interested {
-		background: rgba(245, 158, 11, 0.12);
-		color: #FCD34D;
-		border: 1px solid rgba(245, 158, 11, 0.2);
-	}
 </style>

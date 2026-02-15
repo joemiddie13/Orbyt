@@ -23,22 +23,21 @@
 	onclick={onClose}
 >
 	<div
-		class="absolute glass-panel rounded-xl overflow-hidden"
-		style="left: {left}px; top: {top}px; min-width: 160px;"
+		class="absolute glass-panel rounded-lg overflow-hidden p-1.5 flex flex-col gap-1"
+		style="left: {left}px; top: {top}px; min-width: 170px;"
 		onclick={(e) => e.stopPropagation()}
 	>
 		<button
 			onclick={onEditCaption}
-			class="w-full px-4 py-2.5 text-left text-sm text-white/70 hover:bg-white/10 active:bg-white/15 transition cursor-pointer flex items-center gap-2"
+			class="lego-btn lego-btn-sm lego-amber w-full justify-start gap-2"
 		>
-			<span class="text-base">✏️</span> Edit Caption
+			<span class="text-base leading-none">✏️</span> Edit Caption
 		</button>
-		<div class="h-px bg-white/[0.08]"></div>
 		<button
 			onclick={onDelete}
-			class="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 active:bg-red-500/15 transition cursor-pointer flex items-center gap-2"
+			class="lego-btn lego-btn-sm lego-red w-full justify-start gap-2"
 		>
-			<span class="text-base">🗑️</span> Delete Photo
+			<span class="text-base leading-none">🗑️</span> Delete Photo
 		</button>
 	</div>
 </div>

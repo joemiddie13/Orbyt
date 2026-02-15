@@ -148,7 +148,7 @@
 		<button
 			onclick={onAddNote}
 			onmouseenter={noteEnter}
-			class="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 active:bg-amber-700 transition cursor-pointer campfire-btn flex items-center gap-1.5"
+			class="lego-btn lego-amber flex items-center gap-1.5"
 		>
 			<svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
 				<!-- Pencil body -->
@@ -170,7 +170,7 @@
 		<button
 			onclick={onCreateBeacon}
 			onmouseenter={beaconEnter}
-			class="px-3 py-1.5 rounded-xl bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 active:bg-orange-700 transition cursor-pointer campfire-btn flex items-center gap-1.5"
+			class="lego-btn lego-orange flex items-center gap-1.5"
 		>
 			<svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
 				<!-- Center dot -->
@@ -193,7 +193,7 @@
 		<button
 			onclick={onAddPhoto}
 			onmouseenter={photoEnter}
-			class="px-3 py-1.5 rounded-xl bg-violet-500 text-white text-sm font-medium hover:bg-violet-600 active:bg-violet-700 transition cursor-pointer campfire-btn flex items-center gap-1.5"
+			class="lego-btn lego-violet flex items-center gap-1.5"
 		>
 			<svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
 				<!-- Camera body -->
@@ -242,7 +242,7 @@
 	<button
 		onclick={handleSignOut}
 		disabled={isSigningOut}
-		class="px-3 py-1.5 rounded-xl text-white/60 text-sm hover:bg-white/10 active:bg-white/15 disabled:opacity-50 transition cursor-pointer"
+		class="lego-btn lego-btn-sm lego-neutral"
 	>
 		Sign out
 	</button>

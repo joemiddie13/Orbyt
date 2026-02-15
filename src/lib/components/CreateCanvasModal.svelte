@@ -109,7 +109,7 @@
 			<button
 				onclick={createCanvas}
 				disabled={creating || !canvasName.trim()}
-				class="w-full py-2.5 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-default transition cursor-pointer"
+				class="lego-btn lego-btn-full lego-amber"
 			>
 				{creating ? 'Creating...' : 'Create Canvas'}
 			</button>

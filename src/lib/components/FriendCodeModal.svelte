@@ -77,7 +77,7 @@
 					</code>
 					<button
 						onclick={copyCode}
-						class="px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/10 text-sm text-white/70 transition cursor-pointer"
+						class="lego-btn lego-btn-sm lego-neutral"
 					>
 						{copied ? 'Copied!' : 'Copy'}
 					</button>
@@ -100,7 +100,7 @@
 					<button
 						onclick={sendRequest}
 						disabled={sending || !inputCode.trim()}
-						class="px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-default transition cursor-pointer"
+						class="lego-btn lego-btn-sm lego-amber"
 					>
 						{sending ? '...' : 'Add'}
 					</button>

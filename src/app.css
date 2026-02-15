@@ -42,11 +42,356 @@ html, body {
 	color: rgba(255, 255, 255, 0.35);
 }
 
-/* Warm hover glow on action buttons */
-.campfire-btn {
-	transition: box-shadow 0.2s ease, background-color 0.15s ease;
+/* ─── LEGO Brick Button System ─── */
+
+/* Base brick: chunky, square-ish, thick bottom wall */
+.lego-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.375rem;
+	padding: 0.5rem 0.875rem;
+	border-radius: 6px;
+	font-weight: 600;
+	font-size: 0.875rem;
+	font-family: 'Satoshi', system-ui, sans-serif;
+	border: none;
+	cursor: pointer;
+	transform: translateY(0);
+	transition: transform 0.12s ease, box-shadow 0.12s ease, border-bottom 0.12s ease, background 0.12s ease;
+	will-change: transform, box-shadow;
 }
 
-.campfire-btn:hover {
-	box-shadow: 0 0 16px rgba(245, 158, 11, 0.3);
+.lego-btn:hover:not(:disabled) {
+	transform: translateY(-2px);
+}
+
+.lego-btn:active:not(:disabled) {
+	transform: translateY(2px);
+}
+
+.lego-btn:disabled {
+	opacity: 0.45;
+	cursor: default;
+	border-bottom-width: 2px;
+	transform: none;
+	filter: saturate(0.4);
+}
+
+/* Small variant — inline actions */
+.lego-btn-sm {
+	padding: 0.3rem 0.7rem;
+	font-size: 0.8rem;
+	border-radius: 5px;
+}
+
+/* Full-width variant — form submits */
+.lego-btn-full {
+	width: 100%;
+	padding: 0.7rem 1rem;
+	font-size: 0.9rem;
+}
+
+/* ─── Color Variants ─── */
+
+/* Amber — Note, Sign In, Add, Save, Create Canvas */
+.lego-amber {
+	background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+	color: white;
+	text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+	border-bottom: 4px solid #b45309;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lego-amber:hover:not(:disabled) {
+	background: linear-gradient(180deg, #fcd34d 0%, #fbbf24 100%);
+	box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.lego-amber:active:not(:disabled) {
+	border-bottom-width: 1px;
+	background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Orange — Beacon, Broadcast submit */
+.lego-orange {
+	background: linear-gradient(180deg, #fb923c 0%, #f97316 100%);
+	color: white;
+	text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+	border-bottom: 4px solid #9a3412;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lego-orange:hover:not(:disabled) {
+	background: linear-gradient(180deg, #fdba74 0%, #fb923c 100%);
+	box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.lego-orange:active:not(:disabled) {
+	border-bottom-width: 1px;
+	background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Violet — Photo */
+.lego-violet {
+	background: linear-gradient(180deg, #a78bfa 0%, #8b5cf6 100%);
+	color: white;
+	text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+	border-bottom: 4px solid #5b21b6;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lego-violet:hover:not(:disabled) {
+	background: linear-gradient(180deg, #c4b5fd 0%, #a78bfa 100%);
+	box-shadow: 0 4px 12px rgba(139, 92, 246, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.lego-violet:active:not(:disabled) {
+	border-bottom-width: 1px;
+	background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Emerald — Accept, "I'm in" */
+.lego-emerald {
+	background: linear-gradient(180deg, #34d399 0%, #10b981 100%);
+	color: white;
+	text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+	border-bottom: 4px solid #065f46;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lego-emerald:hover:not(:disabled) {
+	background: linear-gradient(180deg, #6ee7b7 0%, #34d399 100%);
+	box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.lego-emerald:active:not(:disabled) {
+	border-bottom-width: 1px;
+	background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Red — Delete */
+.lego-red {
+	background: linear-gradient(180deg, #f87171 0%, #ef4444 100%);
+	color: white;
+	text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+	border-bottom: 4px solid #991b1b;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lego-red:hover:not(:disabled) {
+	background: linear-gradient(180deg, #fca5a5 0%, #f87171 100%);
+	box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.lego-red:active:not(:disabled) {
+	border-bottom-width: 1px;
+	background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Neutral — Decline, Sign Out, "Can't make it", Copy */
+.lego-neutral {
+	background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.06) 100%);
+	color: rgba(255, 255, 255, 0.7);
+	text-shadow: none;
+	border-bottom: 4px solid rgba(255, 255, 255, 0.08);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.lego-neutral:hover:not(:disabled) {
+	background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.10) 100%);
+	color: rgba(255, 255, 255, 0.9);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.lego-neutral:active:not(:disabled) {
+	border-bottom-width: 1px;
+	background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Teal — Direct beacon submit */
+.lego-teal {
+	background: linear-gradient(180deg, #2dd4bf 0%, #14b8a6 100%);
+	color: white;
+	text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+	border-bottom: 4px solid #115e59;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lego-teal:hover:not(:disabled) {
+	background: linear-gradient(180deg, #5eead4 0%, #2dd4bf 100%);
+	box-shadow: 0 4px 12px rgba(20, 184, 166, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.lego-teal:active:not(:disabled) {
+	border-bottom-width: 1px;
+	background: linear-gradient(180deg, #14b8a6 0%, #0d9488 100%);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ─── Active toggle state (for beacon responses) ─── */
+.lego-emerald.active {
+	background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+	border-bottom: 4px solid #064e3b;
+	box-shadow: 0 3px 8px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lego-amber.active {
+	background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+	border-bottom: 4px solid #78350f;
+	box-shadow: 0 3px 8px rgba(245, 158, 11, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lego-neutral.active {
+	background: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.12) 100%);
+	color: white;
+	border-bottom: 4px solid rgba(255, 255, 255, 0.15);
+	box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ─── LEGO Chips — brick-styled name tags ─── */
+
+.lego-chip {
+	display: inline-block;
+	padding: 0.2rem 0.65rem;
+	border-radius: 4px;
+	font-size: 0.8rem;
+	font-weight: 500;
+	font-family: 'Satoshi', system-ui, sans-serif;
+	transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.lego-chip:hover {
+	transform: translateY(-1px);
+}
+
+.lego-chip-emerald {
+	background: linear-gradient(180deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%);
+	color: #6ee7b7;
+	border-bottom: 3px solid rgba(6, 95, 70, 0.6);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.lego-chip-amber {
+	background: linear-gradient(180deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+	color: #fcd34d;
+	border-bottom: 3px solid rgba(120, 53, 15, 0.6);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ─── LEGO Toggle — mini bricks for formatting toolbar (light bg) ─── */
+
+.lego-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.25rem 0.4rem;
+	border-radius: 4px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	cursor: pointer;
+	border: none;
+	color: #57534e;
+	background: linear-gradient(180deg, #fafaf9 0%, #e7e5e4 100%);
+	border-bottom: 2px solid #a8a29e;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+	transform: translateY(0);
+	transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.1s ease, border-bottom 0.1s ease;
+}
+
+.lego-toggle:hover {
+	transform: translateY(-1px);
+	background: linear-gradient(180deg, #ffffff 0%, #f5f5f4 100%);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.lego-toggle:active {
+	transform: translateY(1px);
+	border-bottom-width: 1px;
+	box-shadow: 0 0 1px rgba(0, 0, 0, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.lego-toggle.active {
+	background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+	color: white;
+	border-bottom: 2px solid #b45309;
+	box-shadow: 0 1px 4px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lego-toggle.active:hover {
+	background: linear-gradient(180deg, #fcd34d 0%, #fbbf24 100%);
+	box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.lego-toggle.active:active {
+	border-bottom-width: 1px;
+	background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+}
+
+/* Dark variant — for dark toolbar backgrounds */
+.lego-toggle-dark {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.2rem 0.4rem;
+	border-radius: 4px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	cursor: pointer;
+	border: none;
+	color: #d6d3d1;
+	background: linear-gradient(180deg, #44403c 0%, #292524 100%);
+	border-bottom: 2px solid #1c1917;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+	transform: translateY(0);
+	transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.1s ease, border-bottom 0.1s ease;
+}
+
+.lego-toggle-dark:hover {
+	transform: translateY(-1px) scale(1.15);
+	background: linear-gradient(180deg, #57534e 0%, #3a3733 100%);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.lego-toggle-dark:active {
+	transform: translateY(1px);
+	border-bottom-width: 1px;
+	box-shadow: 0 0 1px rgba(0, 0, 0, 0.2), inset 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.lego-toggle-dark.active {
+	background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+	color: white;
+	border-bottom: 2px solid #b45309;
+	box-shadow: 0 1px 4px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.lego-toggle-dark.active:hover {
+	transform: translateY(-1px) scale(1.15);
+	background: linear-gradient(180deg, #fcd34d 0%, #fbbf24 100%);
+	box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.lego-toggle-dark.active:active {
+	border-bottom-width: 1px;
+	background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+}
+
+/* Delete variant for dark toggle */
+.lego-toggle-dark.delete {
+	color: #fca5a5;
+	background: linear-gradient(180deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.08) 100%);
+	border-bottom: 2px solid rgba(153, 27, 27, 0.6);
+}
+
+.lego-toggle-dark.delete:hover {
+	color: #fecaca;
+	background: linear-gradient(180deg, rgba(239, 68, 68, 0.25) 0%, rgba(239, 68, 68, 0.15) 100%);
+	box-shadow: 0 2px 6px rgba(239, 68, 68, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }

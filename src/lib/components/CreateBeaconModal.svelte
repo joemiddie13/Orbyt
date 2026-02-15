@@ -944,7 +944,7 @@
 				bind:this={submitBtn}
 				onclick={createBeacon}
 				disabled={creating || !whatText.trim()}
-				class="submit-btn cursor-pointer {visibilityType === 'direct' ? 'direct' : ''}"
+				class="lego-btn lego-btn-full {visibilityType === 'direct' ? 'lego-teal' : 'lego-orange'} cursor-pointer"
 			>
 				{creating ? 'Broadcasting...' : 'Broadcast Beacon'}
 			</button>
@@ -1045,65 +1045,6 @@
 		background: rgba(38, 166, 154, 0.15);
 		color: #26A69A;
 		border-color: rgba(38, 166, 154, 0.4);
-	}
-
-	/* 3D Button — convex surface with depth */
-	.submit-btn {
-		width: 100%;
-		padding: 0.7rem 1rem;
-		border-radius: 0.75rem;
-		background: linear-gradient(180deg, #FFB74D 0%, #F57C00 100%);
-		color: white;
-		font-weight: 600;
-		font-size: 0.9rem;
-		border: 1px solid rgba(0, 0, 0, 0.15);
-		font-family: 'Satoshi', sans-serif;
-		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-		box-shadow:
-			0 4px 8px rgba(0, 0, 0, 0.3),
-			0 1px 3px rgba(0, 0, 0, 0.2),
-			inset 0 1px 0 rgba(255, 255, 255, 0.25);
-		transform: translateY(0);
-		transition: all 0.15s ease;
-		will-change: transform, box-shadow;
-	}
-
-	.submit-btn:hover:not(:disabled) {
-		background: linear-gradient(180deg, #FFCC80 0%, #FF9800 100%);
-		box-shadow:
-			0 6px 14px rgba(0, 0, 0, 0.35),
-			0 2px 5px rgba(0, 0, 0, 0.2),
-			inset 0 1px 0 rgba(255, 255, 255, 0.3);
-		transform: translateY(-1px);
-	}
-
-	.submit-btn:active:not(:disabled) {
-		background: linear-gradient(180deg, #FFA726 0%, #E65100 100%);
-		box-shadow:
-			0 2px 4px rgba(0, 0, 0, 0.3),
-			0 1px 2px rgba(0, 0, 0, 0.2),
-			inset 0 2px 4px rgba(0, 0, 0, 0.15);
-		transform: translateY(1px);
-	}
-
-	.submit-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
-		box-shadow:
-			0 2px 4px rgba(0, 0, 0, 0.2),
-			inset 0 1px 0 rgba(255, 255, 255, 0.1);
-	}
-
-	.submit-btn.direct {
-		background: linear-gradient(180deg, #4DB6AC 0%, #00796B 100%);
-	}
-
-	.submit-btn.direct:hover:not(:disabled) {
-		background: linear-gradient(180deg, #80CBC4 0%, #009688 100%);
-	}
-
-	.submit-btn.direct:active:not(:disabled) {
-		background: linear-gradient(180deg, #26A69A 0%, #004D40 100%);
 	}
 
 	.ambient-orb {
