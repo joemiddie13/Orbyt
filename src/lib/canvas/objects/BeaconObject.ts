@@ -1,21 +1,51 @@
-import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, Sprite, Text, Texture, TextStyle } from 'pixi.js';
 import { gsap } from '../gsapInit';
 import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
 
 /**
- * BeaconObject — a glowing event card on the canvas.
+ * BeaconObject — a living broadcast signal on the canvas.
  *
- * Visual: rounded rect with amber/orange gradient, pin icon, title, time.
- * Pulse animation via tween.js (glow ring oscillates alpha + scale).
- * Pop-in animation on creation (scale 0 → 1 easeOutBack).
+ * The card face uses a halftone dot display inspired by ASCII/dither art:
+ * a grid of circles whose SIZE varies with signal wave intensity — big dots
+ * where the signal is strong, tiny specks where it's quiet. Concentric waves
+ * radiate outward from center, creating a living halftone animation.
+ * Around the card: ripple emanation, cascading heartbeat pulse, signal dot
+ * antenna, and layered ambient glow. Expired beacons dim and go silent.
  */
 
 const BEACON_WIDTH = 260;
 const BEACON_PADDING = 16;
 const CORNER_RADIUS = 16;
 const BEACON_COLOR = 0xFFA726;
-const BEACON_COLOR_DARK = 0xF57C00;
 const DIRECT_BEACON_COLOR = 0x26A69A;
+
+// --- Living beacon animation constants ---
+const RIPPLE_SPAWN_MS = 2800;
+const RIPPLE_DURATION = 3.5;
+const RIPPLE_MAX_SCALE = 4.5;
+const RIPPLE_MAX_ALIVE = 3;
+const HEARTBEAT_REPEAT_DELAY = 1.8;
+
+// Halftone display — sprites whose SCALE varies with signal intensity
+const HALFTONE_CELL = 16;
+const HALFTONE_TEX_SIZE = 32;
+
+/** Shared white circle texture — created once, used by all beacon dot sprites */
+let _circleTexture: Texture | null = null;
+function getCircleTexture(): Texture {
+	if (!_circleTexture) {
+		const c = document.createElement('canvas');
+		c.width = HALFTONE_TEX_SIZE;
+		c.height = HALFTONE_TEX_SIZE;
+		const ctx = c.getContext('2d')!;
+		ctx.beginPath();
+		ctx.arc(HALFTONE_TEX_SIZE / 2, HALFTONE_TEX_SIZE / 2, HALFTONE_TEX_SIZE / 2 - 1, 0, Math.PI * 2);
+		ctx.fillStyle = '#ffffff';
+		ctx.fill();
+		_circleTexture = Texture.from(c);
+	}
+	return _circleTexture;
+}
 
 export interface BeaconContent {
 	title: string;
@@ -45,16 +75,39 @@ export interface BeaconObjectOptions {
 export class BeaconObject {
 	container: Container;
 	objectId?: string;
+
+	// Visual layers
+	private rippleLayer: Container;
+	private ambientGlow: Graphics;
 	private outerGlow: Graphics;
 	private glowRing: Graphics;
-	private pulseTween: gsap.core.Tween | null = null;
+	private cardBg: Graphics;
+	private signalDot: Graphics;
+
+	// Halftone animation (sprite-based — no geometry rebuild per frame)
+	private halftoneContainer: Container | null = null;
+	private halftoneDots: { sprite: Sprite; dist: number }[] = [];
+	private halftoneMask: Graphics | null = null;
+	private halftoneTime: number = 0;
+	private animTick: (() => void) | null = null;
+
+	// Animation state
+	private pulseTl: gsap.core.Timeline | null = null;
+	private rippleInterval: ReturnType<typeof setInterval> | null = null;
+	private activeRipples: { graphics: Graphics; tweens: gsap.core.Tween[] }[] = [];
 	private isExpired: boolean;
+	private baseColor: number;
+	private cardHeight: number;
+
+	// Response dots
+	private responseDots: Graphics | null = null;
 
 	constructor(content: BeaconContent, x: number, y: number, options: BeaconObjectOptions = {}) {
 		this.objectId = options.objectId;
 		this.isExpired = options.isExpired ?? false;
 		const isDirect = options.isDirect ?? content.visibilityType === 'direct';
-		const baseColor = isDirect ? DIRECT_BEACON_COLOR : BEACON_COLOR;
+		this.baseColor = isDirect ? DIRECT_BEACON_COLOR : BEACON_COLOR;
+		this.cardHeight = BEACON_WIDTH; // Square card
 
 		this.container = new Container();
 		this.container.x = x;
@@ -62,92 +115,162 @@ export class BeaconObject {
 		this.container.eventMode = 'static';
 		this.container.cursor = (options.editable !== false) ? 'pointer' : 'default';
 
-		// Outer diffuse glow (wider, more transparent)
+		// --- Layer 1: Ripple emanation (behind everything) ---
+		this.rippleLayer = new Container();
+		this.rippleLayer.x = BEACON_WIDTH / 2;
+		this.rippleLayer.y = this.cardHeight / 2;
+		this.container.addChild(this.rippleLayer);
+
+		// --- Layer 2: Ambient glow (soft radiance circle) ---
+		this.ambientGlow = new Graphics();
+		this.drawAmbientGlow();
+		this.ambientGlow.alpha = 0.5;
+		this.container.addChild(this.ambientGlow);
+
+		// --- Layer 3: Outer diffuse glow ---
 		this.outerGlow = new Graphics();
-		this.drawOuterGlow(baseColor);
+		this.drawOuterGlow();
+		this.outerGlow.alpha = 0.6;
 		this.container.addChild(this.outerGlow);
 
-		// Inner glow ring (pulse animation target)
+		// --- Layer 4: Inner glow ring ---
 		this.glowRing = new Graphics();
-		this.drawGlowRing(baseColor);
+		this.drawGlowRing();
+		this.glowRing.alpha = 0.6;
 		this.container.addChild(this.glowRing);
 
-		// Background card
-		const bg = new Graphics();
-		const height = this.calculateHeight(content);
-		bg.roundRect(0, 0, BEACON_WIDTH, height, CORNER_RADIUS);
-		bg.fill(baseColor);
-		// Darker bottom edge
-		bg.roundRect(0, height - 4, BEACON_WIDTH, 4, 0);
-		bg.fill(isDirect ? 0x00897B : BEACON_COLOR_DARK);
-		this.container.addChild(bg);
+		// --- Layer 5: Card background (dark base) ---
+		this.cardBg = new Graphics();
+		this.cardBg.roundRect(0, 0, BEACON_WIDTH, this.cardHeight, CORNER_RADIUS);
+		this.cardBg.fill(this.isExpired ? 0x1a1a2e : 0x0a0a14);
+		this.container.addChild(this.cardBg);
 
-		// Title
+		// --- Layer 5b: Halftone dot display (sprite-based, no per-frame geometry rebuild) ---
+		if (!this.isExpired) {
+			this.halftoneContainer = new Container();
+			this.container.addChild(this.halftoneContainer);
+
+			const tex = getCircleTexture();
+			const cell = HALFTONE_CELL;
+			const cols = Math.ceil(BEACON_WIDTH / cell);
+			const rows = Math.ceil(this.cardHeight / cell);
+			const cx = BEACON_WIDTH / 2;
+			const cy = this.cardHeight / 2;
+			const aspect = BEACON_WIDTH / this.cardHeight;
+
+			for (let row = 0; row < rows; row++) {
+				for (let col = 0; col < cols; col++) {
+					const x = col * cell + cell / 2;
+					const y = row * cell + cell / 2;
+					const nx = (x - cx) / cx;
+					const ny = ((y - cy) / cy) / aspect;
+					const dist = Math.sqrt(nx * nx + ny * ny);
+
+					const sprite = new Sprite(tex);
+					sprite.anchor.set(0.5);
+					sprite.x = x;
+					sprite.y = y;
+					sprite.tint = this.baseColor;
+					sprite.scale.set(0.03);
+					sprite.alpha = 0.15;
+					this.halftoneContainer.addChild(sprite);
+					this.halftoneDots.push({ sprite, dist });
+				}
+			}
+
+			// Mask dots to card shape (rounded corners)
+			this.halftoneMask = new Graphics();
+			this.halftoneMask.roundRect(0, 0, BEACON_WIDTH, this.cardHeight, CORNER_RADIUS);
+			this.halftoneMask.fill(0xffffff);
+			this.container.addChild(this.halftoneMask);
+			this.halftoneContainer.mask = this.halftoneMask;
+
+			// Drive halftone — just property updates, runs at full framerate
+			this.animTick = () => {
+				this.halftoneTime += 0.016;
+				this.updateHalftone();
+			};
+			gsap.ticker.add(this.animTick);
+			this.updateHalftone();
+		}
+
+		// --- Layer 6: Signal dot (antenna at top center) ---
+		this.signalDot = new Graphics();
+		this.signalDot.circle(0, 0, 5);
+		this.signalDot.fill({ color: 0xffffff, alpha: 0.9 });
+		this.signalDot.circle(0, 0, 2.5);
+		this.signalDot.fill(this.baseColor);
+		this.signalDot.x = BEACON_WIDTH / 2;
+		this.signalDot.y = -3;
+		this.signalDot.alpha = 0.7;
+		this.container.addChild(this.signalDot);
+
+		// --- Layer 7: Text content ---
 		const titleStyle = new TextStyle({
 			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
-			fontSize: 15,
+			fontSize: 18,
 			fontWeight: 'bold',
 			fill: 0xffffff,
 			wordWrap: true,
-			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2 - 24,
-			lineHeight: 20,
+			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2 - 28,
+			lineHeight: 24,
 		});
 		const titleText = new Text({ text: content.title, style: titleStyle });
-		titleText.x = BEACON_PADDING + 20;
+		titleText.x = BEACON_PADDING + 24;
 		titleText.y = BEACON_PADDING;
 		this.container.addChild(titleText);
 
-		// Pin icon (simple circle)
+		// Pin icon — bright on dark background
 		const pin = new Graphics();
-		pin.circle(BEACON_PADDING + 7, BEACON_PADDING + 8, 6);
+		pin.circle(BEACON_PADDING + 8, BEACON_PADDING + 10, 7);
 		pin.fill(0xffffff);
-		pin.circle(BEACON_PADDING + 7, BEACON_PADDING + 8, 2);
-		pin.fill(baseColor);
+		pin.circle(BEACON_PADDING + 8, BEACON_PADDING + 10, 2.5);
+		pin.fill(this.baseColor);
 		this.container.addChild(pin);
 
 		// Time display
 		const timeStr = this.formatTimeRange(content.startTime, content.endTime);
 		const timeStyle = new TextStyle({
 			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
-			fontSize: 12,
+			fontSize: 14,
 			fill: 0xffffff,
 			wordWrap: true,
 			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
 		});
 		const timeText = new Text({ text: timeStr, style: timeStyle });
 		timeText.x = BEACON_PADDING;
-		timeText.y = titleText.y + titleText.height + 6;
+		timeText.y = titleText.y + titleText.height + 8;
 		timeText.alpha = 0.85;
 		this.container.addChild(timeText);
 
-		// Location if present
+		// "From [username]" for direct beacons — above bottom info
+		if (isDirect && content.fromUsername) {
+			const fromStyle = new TextStyle({
+				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+				fontSize: 13,
+				fill: 0xffffff,
+			});
+			const fromText = new Text({ text: `From ${content.fromUsername}`, style: fromStyle });
+			fromText.x = BEACON_PADDING;
+			fromText.y = this.cardHeight - BEACON_PADDING - (content.locationAddress ? 34 : 16);
+			fromText.alpha = 0.7;
+			this.container.addChild(fromText);
+		}
+
+		// Location — pinned to bottom of card
 		if (content.locationAddress) {
 			const locStyle = new TextStyle({
 				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
-				fontSize: 11,
+				fontSize: 13,
 				fill: 0xffffff,
 				wordWrap: true,
 				wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
 			});
 			const locText = new Text({ text: `📍 ${content.locationAddress}`, style: locStyle });
 			locText.x = BEACON_PADDING;
-			locText.y = timeText.y + timeText.height + 4;
+			locText.y = this.cardHeight - BEACON_PADDING - 16;
 			locText.alpha = 0.75;
 			this.container.addChild(locText);
-		}
-
-		// "From [username]" for direct beacons
-		if (isDirect && content.fromUsername) {
-			const fromStyle = new TextStyle({
-				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
-				fontSize: 11,
-				fill: 0xffffff,
-			});
-			const fromText = new Text({ text: `From ${content.fromUsername}`, style: fromStyle });
-			fromText.x = BEACON_PADDING;
-			fromText.y = height - BEACON_PADDING - 14;
-			fromText.alpha = 0.7;
-			this.container.addChild(fromText);
 		}
 
 		// Expired label
@@ -161,11 +284,11 @@ export class BeaconObject {
 			});
 			const expText = new Text({ text: 'Expired', style: expStyle });
 			expText.x = BEACON_WIDTH / 2 - expText.width / 2;
-			expText.y = height / 2 - 8;
+			expText.y = this.cardHeight / 2 - 8;
 			this.container.addChild(expText);
 		}
 
-		// Owner: full drag + long-press. Visitor: long-press only (sticker reactions).
+		// --- Interactions ---
 		if (options.editable !== false) {
 			makeDraggable(this.container, {
 				onDragEnd: (finalX, finalY) => {
@@ -190,7 +313,7 @@ export class BeaconObject {
 			});
 		}
 
-		// Tap handler for viewing beacon details (works for all users)
+		// Tap handler
 		if (options.onTap) {
 			let didMove = false;
 			this.container.on('pointerdown', () => { didMove = false; });
@@ -202,83 +325,253 @@ export class BeaconObject {
 			});
 		}
 
-		// Pop-in animation
+		// --- Pop-in animation ---
 		if (options.animate !== false) {
 			this.container.scale.set(0);
-			gsap.to(this.container.scale, { x: 1, y: 1, duration: 0.4, ease: 'back.out(1.7)' });
+			gsap.to(this.container.scale, {
+				x: 1, y: 1, duration: 0.5, ease: 'back.out(1.7)',
+				onComplete: () => {
+					// Arrival burst — signal dot announces the beacon
+					if (!this.isExpired) {
+						gsap.fromTo(this.signalDot.scale, { x: 1, y: 1 }, {
+							x: 2, y: 2, duration: 0.2, ease: 'power2.out', yoyo: true, repeat: 1,
+						});
+						gsap.fromTo(this.signalDot, { alpha: 0.7 }, {
+							alpha: 1, duration: 0.2, ease: 'power2.out', yoyo: true, repeat: 1,
+						});
+					}
+				},
+			});
 		}
 
-		// Start pulse if not expired
+		// Start living pulse if not expired
 		if (!this.isExpired) {
-			this.startPulse();
+			this.startLivingPulse();
 		}
 	}
 
-	/** Outer diffuse glow — wide, soft ambient light */
-	private drawOuterGlow(color: number) {
+	// --- Glow layer drawing ---
+
+	/** Ambient glow — large soft circle radiating warmth beyond the card */
+	private drawAmbientGlow() {
+		this.ambientGlow.clear();
+		const cx = BEACON_WIDTH / 2;
+		const cy = this.cardHeight / 2;
+		const r = Math.max(BEACON_WIDTH, this.cardHeight) * 0.6;
+		this.ambientGlow.circle(cx, cy, r);
+		this.ambientGlow.fill({ color: this.baseColor, alpha: 0.10 });
+	}
+
+	/** Outer diffuse glow — wide, soft halo around the card */
+	private drawOuterGlow() {
 		this.outerGlow.clear();
-		const h = this.calculateHeight({ title: '', startTime: 0, endTime: 0, visibilityType: 'canvas' });
-		this.outerGlow.roundRect(-12, -12, BEACON_WIDTH + 24, h + 24, CORNER_RADIUS + 8);
-		this.outerGlow.fill({ color, alpha: 0.08 });
+		this.outerGlow.roundRect(-18, -18, BEACON_WIDTH + 36, this.cardHeight + 36, CORNER_RADIUS + 12);
+		this.outerGlow.fill({ color: this.baseColor, alpha: 0.12 });
 	}
 
-	/** Inner glow ring that pulses */
-	private drawGlowRing(color: number) {
+	/** Inner glow ring — tight pulsing ring around the card */
+	private drawGlowRing() {
 		this.glowRing.clear();
-		const h = this.calculateHeight({ title: '', startTime: 0, endTime: 0, visibilityType: 'canvas' });
-		this.glowRing.roundRect(-6, -6, BEACON_WIDTH + 12, h + 12, CORNER_RADIUS + 4);
-		this.glowRing.fill({ color, alpha: 0.2 });
+		this.glowRing.roundRect(-8, -8, BEACON_WIDTH + 16, this.cardHeight + 16, CORNER_RADIUS + 6);
+		this.glowRing.fill({ color: this.baseColor, alpha: 0.25 });
 	}
 
-	private startPulse() {
-		this.glowRing.alpha = 0.2;
-		this.glowRing.scale.set(1.0);
-		this.outerGlow.alpha = 0.08;
-		this.outerGlow.scale.set(1.0);
+	// --- Living pulse system ---
 
-		// Inner ring — pulse alpha + scale
-		this.pulseTween = gsap.to(this.glowRing, {
-			alpha: 0.5,
-			duration: 2.0,
-			ease: 'sine.inOut',
-			repeat: -1,
-			yoyo: true,
-		});
-		gsap.to(this.glowRing.scale, {
-			x: 1.12,
-			y: 1.12,
-			duration: 2.0,
-			ease: 'sine.inOut',
-			repeat: -1,
-			yoyo: true,
-		});
+	/** Start the cascading heartbeat + ripple emanation */
+	private startLivingPulse() {
+		this.pulseTl = gsap.timeline({ repeat: -1, repeatDelay: HEARTBEAT_REPEAT_DELAY });
 
-		// Outer ring — slower, subtler breathing
-		gsap.to(this.outerGlow, {
-			alpha: 0.14,
-			duration: 2.5,
-			ease: 'sine.inOut',
-			repeat: -1,
-			yoyo: true,
-		});
-		gsap.to(this.outerGlow.scale, {
-			x: 1.06,
-			y: 1.06,
-			duration: 2.5,
-			ease: 'sine.inOut',
-			repeat: -1,
-			yoyo: true,
-		});
+		// Beat origin: Signal dot flash
+		this.pulseTl.to(this.signalDot.scale, {
+			x: 1.5, y: 1.5, duration: 0.15, ease: 'power2.out',
+		}, 0);
+		this.pulseTl.to(this.signalDot, {
+			alpha: 1, duration: 0.15, ease: 'power2.out',
+		}, 0);
+		this.pulseTl.to(this.signalDot.scale, {
+			x: 1, y: 1, duration: 0.4, ease: 'power2.in',
+		}, 0.15);
+		this.pulseTl.to(this.signalDot, {
+			alpha: 0.7, duration: 0.4, ease: 'power2.in',
+		}, 0.15);
+
+		// Wave reaches inner glow ring
+		this.pulseTl.to(this.glowRing, {
+			alpha: 1.0, duration: 0.2, ease: 'power2.out',
+		}, 0.08);
+		this.pulseTl.to(this.glowRing.scale, {
+			x: 1.12, y: 1.12, duration: 0.2, ease: 'power2.out',
+		}, 0.08);
+		this.pulseTl.to(this.glowRing, {
+			alpha: 0.6, duration: 0.45, ease: 'sine.out',
+		}, 0.28);
+		this.pulseTl.to(this.glowRing.scale, {
+			x: 1, y: 1, duration: 0.45, ease: 'sine.out',
+		}, 0.28);
+
+		// Wave reaches outer glow
+		this.pulseTl.to(this.outerGlow, {
+			alpha: 1.0, duration: 0.25, ease: 'power2.out',
+		}, 0.15);
+		this.pulseTl.to(this.outerGlow.scale, {
+			x: 1.06, y: 1.06, duration: 0.25, ease: 'power2.out',
+		}, 0.15);
+		this.pulseTl.to(this.outerGlow, {
+			alpha: 0.6, duration: 0.45, ease: 'sine.out',
+		}, 0.4);
+		this.pulseTl.to(this.outerGlow.scale, {
+			x: 1, y: 1, duration: 0.45, ease: 'sine.out',
+		}, 0.4);
+
+		// Wave reaches ambient glow
+		this.pulseTl.to(this.ambientGlow, {
+			alpha: 1.0, duration: 0.3, ease: 'power2.out',
+		}, 0.12);
+		this.pulseTl.to(this.ambientGlow, {
+			alpha: 0.5, duration: 0.5, ease: 'sine.out',
+		}, 0.42);
+
+		// Card micro-scale bump — the whole card breathes
+		this.pulseTl.to(this.cardBg.scale, {
+			x: 1.006, y: 1.006, duration: 0.15, ease: 'power2.out',
+		}, 0.10);
+		this.pulseTl.to(this.cardBg.scale, {
+			x: 1, y: 1, duration: 0.35, ease: 'sine.out',
+		}, 0.25);
+
+		// Start ripple emanation
+		this.startRipples();
 	}
 
+	// --- Ripple emanation ---
+
+	/** Begin spawning ripple circles at regular intervals */
+	private startRipples() {
+		this.spawnRipple();
+		this.rippleInterval = setInterval(() => this.spawnRipple(), RIPPLE_SPAWN_MS);
+	}
+
+	/** Stop spawning ripples and clean up active ones */
+	private stopRipples() {
+		if (this.rippleInterval) {
+			clearInterval(this.rippleInterval);
+			this.rippleInterval = null;
+		}
+		for (const entry of this.activeRipples) {
+			for (const t of entry.tweens) t.kill();
+			this.rippleLayer.removeChild(entry.graphics);
+			entry.graphics.destroy();
+		}
+		this.activeRipples = [];
+	}
+
+	/** Spawn a single expanding ripple circle */
+	private spawnRipple() {
+		if (this.activeRipples.length >= RIPPLE_MAX_ALIVE) return;
+
+		const ripple = new Graphics();
+		// Draw circle centered at (0,0) — rippleLayer is positioned at card center
+		const radius = Math.max(BEACON_WIDTH, this.cardHeight) * 0.35;
+		ripple.circle(0, 0, radius);
+		ripple.stroke({ width: 1.5, color: this.baseColor, alpha: 0.4 });
+		ripple.alpha = 0.25;
+		ripple.scale.set(0.3);
+		this.rippleLayer.addChild(ripple);
+
+		const entry: { graphics: Graphics; tweens: gsap.core.Tween[] } = { graphics: ripple, tweens: [] };
+
+		const onComplete = () => {
+			this.rippleLayer.removeChild(ripple);
+			ripple.destroy();
+			const idx = this.activeRipples.indexOf(entry);
+			if (idx !== -1) this.activeRipples.splice(idx, 1);
+		};
+
+		// Scale outward
+		entry.tweens.push(gsap.to(ripple.scale, {
+			x: RIPPLE_MAX_SCALE, y: RIPPLE_MAX_SCALE,
+			duration: RIPPLE_DURATION,
+			ease: 'power1.out',
+		}));
+
+		// Fade out (with onComplete to clean up)
+		entry.tweens.push(gsap.to(ripple, {
+			alpha: 0,
+			duration: RIPPLE_DURATION,
+			ease: 'power1.out',
+			onComplete,
+		}));
+
+		this.activeRipples.push(entry);
+	}
+
+	// --- Halftone updater (CodePen-inspired: Luma → Size) ---
+
+	/** Update sprite scale/alpha based on signal wave intensity — no geometry rebuild */
+	private updateHalftone() {
+		const t = this.halftoneTime;
+		const maxScale = (HALFTONE_CELL * 0.84) / HALFTONE_TEX_SIZE;
+		const minScale = 1 / HALFTONE_TEX_SIZE;
+
+		for (let i = 0; i < this.halftoneDots.length; i++) {
+			const { sprite, dist } = this.halftoneDots[i];
+
+			const w1 = Math.pow(Math.sin(dist * 20 - t * 2.2) * 0.5 + 0.5, 2.5);
+			const f1 = Math.max(0, 1 - dist * 1.7);
+
+			const w2 = Math.pow(Math.sin(dist * 12 - t * 1.3 + 2) * 0.5 + 0.5, 4) * 0.35;
+			const f2 = Math.max(0, 1 - dist * 2);
+
+			const breath = Math.sin(t * 0.8) * 0.08 + 0.12;
+			const center = Math.max(0, 1 - dist * 2.5) * 0.6;
+
+			let intensity = w1 * f1 + w2 * f2 + breath + center;
+			if (intensity < 0) intensity = 0;
+			else if (intensity > 1) intensity = 1;
+
+			const s = minScale + (maxScale - minScale) * intensity;
+			sprite.scale.set(s);
+			sprite.alpha = 0.15 + 0.85 * intensity;
+		}
+	}
+
+	// --- Pulse control ---
+
+	/** Stop all living pulse animations */
 	stopPulse() {
+		if (this.pulseTl) {
+			this.pulseTl.kill();
+			this.pulseTl = null;
+		}
+		this.stopRipples();
+
+		// Stop halftone animation
+		if (this.animTick) {
+			gsap.ticker.remove(this.animTick);
+			this.animTick = null;
+		}
+		// Dim all dots
+		for (const dot of this.halftoneDots) {
+			dot.sprite.scale.set(0.03);
+			dot.sprite.alpha = 0.1;
+		}
+
+		// Reset glow layers to dim
+		gsap.killTweensOf(this.signalDot);
+		gsap.killTweensOf(this.signalDot.scale);
 		gsap.killTweensOf(this.glowRing);
 		gsap.killTweensOf(this.glowRing.scale);
 		gsap.killTweensOf(this.outerGlow);
 		gsap.killTweensOf(this.outerGlow.scale);
-		this.pulseTween = null;
-		this.glowRing.alpha = 0.1;
-		this.outerGlow.alpha = 0.04;
+		gsap.killTweensOf(this.ambientGlow);
+		gsap.killTweensOf(this.cardBg.scale);
+
+		this.signalDot.alpha = 0.3;
+		this.glowRing.alpha = 0.15;
+		this.outerGlow.alpha = 0.15;
+		this.ambientGlow.alpha = 0.15;
+		this.cardBg.scale.set(1);
 	}
 
 	setExpired() {
@@ -287,14 +580,23 @@ export class BeaconObject {
 		this.stopPulse();
 	}
 
-	/** Stop tweens before destroying — prevents stale callbacks on destroyed Graphics */
+	/** Stop all tweens, animations, and clean up before removal */
 	destroy() {
 		this.stopPulse();
+		// Clean up halftone sprites
+		this.halftoneDots = [];
+		if (this.halftoneContainer) {
+			this.halftoneContainer.mask = null;
+			this.halftoneContainer.destroy({ children: true });
+			this.halftoneContainer = null;
+		}
+		if (this.halftoneMask) {
+			this.halftoneMask.destroy();
+			this.halftoneMask = null;
+		}
 	}
 
 	/** Response dots — small colored circles indicating people */
-	private responseDots: Graphics | null = null;
-
 	updateResponseDots(responses: Array<{ status: string }>) {
 		if (this.responseDots) {
 			this.container.removeChild(this.responseDots);
