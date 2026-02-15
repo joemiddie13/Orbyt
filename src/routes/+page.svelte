@@ -16,7 +16,7 @@
 	import NoteDetailPanel from '$lib/components/NoteDetailPanel.svelte';
 	import InlineNoteEditor from '$lib/components/InlineNoteEditor.svelte';
 	import StickerPicker from '$lib/components/StickerPicker.svelte';
-	import PhotoActionMenu from '$lib/components/PhotoActionMenu.svelte';
+	import PhotoDetailPanel from '$lib/components/PhotoDetailPanel.svelte';
 	import ViewerAvatars from '$lib/components/ViewerAvatars.svelte';
 	import { TextBlock } from '$lib/canvas/objects/TextBlock';
 
@@ -55,7 +55,7 @@
 	let selectedBeacon = $state<any>(null);
 	let selectedNote = $state<any>(null);
 	let stickerPickerState = $state<{ objectId: string; x: number; y: number } | null>(null);
-	let photoMenuState = $state<{ objectId: string; x: number; y: number } | null>(null);
+	let selectedPhoto = $state<any>(null);
 
 	// Inline note editor state (owner-only, replaces NoteDetailPanel for owners)
 	let inlineEditState = $state<{
@@ -340,13 +340,12 @@
 			stickerPickerState = { objectId, x: screenX, y: screenY };
 		};
 
-		// Wire up photo tap → action menu (owner only)
+		// Wire up photo tap → detail panel
 		renderer.onPhotoTapped = (objectId) => {
-			if (!isCanvasOwner) return;
-			const photoObj = renderer.getObject(objectId);
-			if (!photoObj) return;
-			const screen = renderer.worldToScreen(photoObj.container.x, photoObj.container.y);
-			photoMenuState = { objectId, x: screen.x, y: screen.y };
+			const obj = canvasObjects.data?.find((o: any) => o._id === objectId);
+			if (obj && obj.type === 'photo') {
+				selectedPhoto = obj;
+			}
 		};
 
 		// Stream cursor position over WebRTC
@@ -533,37 +532,6 @@
 		}
 	}
 
-	/** Delete a photo */
-	async function deletePhoto() {
-		if (!photoMenuState) return;
-		const id = photoMenuState.objectId;
-		photoMenuState = null;
-		try {
-			await client.mutation(api.objects.remove, { id: id as any });
-		} catch (err) {
-			console.error('Failed to delete photo:', err);
-		}
-	}
-
-	/** Edit photo caption */
-	async function editPhotoCaption() {
-		if (!photoMenuState) return;
-		const id = photoMenuState.objectId;
-		const obj = canvasObjects.data?.find((o: any) => o._id === id);
-		photoMenuState = null;
-		const content = obj?.content as { caption?: string } | undefined;
-		const currentCaption = content?.caption ?? '';
-		const newCaption = prompt('Caption:', currentCaption);
-		if (newCaption === null) return;
-		try {
-			await client.mutation(api.photos.updateCaption, {
-				id: id as any,
-				caption: newCaption,
-			});
-		} catch (err) {
-			console.error('Failed to update caption:', err);
-		}
-	}
 </script>
 
 <div bind:this={canvasContainer} class="w-screen h-screen overflow-hidden"></div>
@@ -678,12 +646,11 @@
 	/>
 {/if}
 
-{#if photoMenuState}
-	<PhotoActionMenu
-		x={photoMenuState.x}
-		y={photoMenuState.y}
-		onDelete={deletePhoto}
-		onEditCaption={editPhotoCaption}
-		onClose={() => { photoMenuState = null; }}
+{#if selectedPhoto}
+	<PhotoDetailPanel
+		photo={selectedPhoto}
+		isOwner={isCanvasOwner}
+		onClose={() => { selectedPhoto = null; }}
+		onDeleted={() => { selectedPhoto = null; }}
 	/>
 {/if}
