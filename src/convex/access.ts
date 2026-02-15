@@ -1,10 +1,12 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { getAuthenticatedUser } from "./users";
 import { areFriends } from "./friendships";
 
 /** Check if a user has access to a canvas (owner, member, viewer, or friend) */
-export async function checkCanvasAccess(ctx: any, canvasId: any, userUuid: string, minRole: "viewer" | "member" | "owner" = "viewer") {
+export async function checkCanvasAccess(ctx: QueryCtx | MutationCtx, canvasId: Id<"canvases">, userUuid: string, minRole: "viewer" | "member" | "owner" = "viewer") {
 	const canvas = await ctx.db.get(canvasId);
 	if (!canvas) throw new Error("Canvas not found");
 
@@ -14,7 +16,7 @@ export async function checkCanvasAccess(ctx: any, canvasId: any, userUuid: strin
 	// Check canvasAccess table for explicitly shared canvases
 	const access = await ctx.db
 		.query("canvasAccess")
-		.withIndex("by_canvas_user", (q: any) => q.eq("canvasId", canvasId).eq("userId", userUuid))
+		.withIndex("by_canvas_user", (q) => q.eq("canvasId", canvasId).eq("userId", userUuid))
 		.first();
 
 	if (access) {

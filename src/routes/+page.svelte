@@ -244,8 +244,6 @@
 
 		const myUuid = currentUser.user.uuid;
 		const others = viewers.filter((v: any) => v.userId !== myUuid);
-		if (others.length > 0) {
-		}
 
 		for (const viewer of others) {
 			peerManager.onViewerDiscovered(viewer.userId);
@@ -553,7 +551,8 @@
 		const id = photoMenuState.objectId;
 		const obj = canvasObjects.data?.find((o: any) => o._id === id);
 		photoMenuState = null;
-		const currentCaption = (obj?.content as any)?.caption ?? '';
+		const content = obj?.content as { caption?: string } | undefined;
+		const currentCaption = content?.caption ?? '';
 		const newCaption = prompt('Caption:', currentCaption);
 		if (newCaption === null) return;
 		try {

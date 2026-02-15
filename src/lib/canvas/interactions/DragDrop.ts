@@ -1,4 +1,5 @@
 import { Container, type FederatedPointerEvent } from 'pixi.js';
+import { gsap } from '../gsapInit';
 
 /**
  * DragDrop — makes a PixiJS container draggable with long-press support.
@@ -173,4 +174,83 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 
 	target.on('pointerup', endDrag);
 	target.on('pointerupoutside', endDrag);
+}
+
+/**
+ * Makes a container respond to taps (pointerdown → pointerup without movement).
+ * Prevents false taps from drag gestures by tracking movement.
+ */
+export function makeTappable(target: Container, onTap: () => void) {
+	let didMove = false;
+	target.on('pointerdown', () => { didMove = false; });
+	target.on('globalpointermove', () => { didMove = true; });
+	target.on('pointerup', () => {
+		if (!didMove) onTap();
+	});
+}
+
+/**
+ * Drag lift animation — scale up + random tilt.
+ * Returns the random tilt delta for use in the drop animation.
+ */
+export function animateDragLift(container: Container, baseRotation = 0): number {
+	gsap.killTweensOf(container.scale);
+	gsap.killTweensOf(container);
+
+	const liftRotation = (Math.random() > 0.5 ? 1 : -1) * (0.02 + Math.random() * 0.02);
+
+	const tl = gsap.timeline();
+	tl.to(container.scale, {
+		x: 1.05, y: 1.05,
+		duration: 0.2,
+		ease: 'power2.out',
+	}, 0);
+	tl.to(container, {
+		rotation: baseRotation + liftRotation,
+		duration: 0.25,
+		ease: 'power2.out',
+	}, 0);
+
+	return liftRotation;
+}
+
+/**
+ * Drag drop animation — squash-stretch impact + wobble settling.
+ */
+export function animateDragDrop(container: Container, liftRotation: number, baseRotation = 0) {
+	gsap.killTweensOf(container.scale);
+	gsap.killTweensOf(container);
+
+	const tl = gsap.timeline();
+
+	// Squash on impact
+	tl.to(container.scale, {
+		x: 1.03, y: 0.97,
+		duration: 0.1,
+		ease: 'power2.in',
+	});
+
+	// Spring back to 1.0
+	tl.to(container.scale, {
+		x: 1, y: 1,
+		duration: 0.3,
+		ease: 'elastic.out(1, 0.4)',
+	});
+
+	// Wobble rotation back to base
+	tl.to(container, {
+		rotation: baseRotation - liftRotation * 0.5,
+		duration: 0.12,
+		ease: 'power2.inOut',
+	}, 0);
+	tl.to(container, {
+		rotation: baseRotation + liftRotation * 0.25,
+		duration: 0.15,
+		ease: 'sine.inOut',
+	});
+	tl.to(container, {
+		rotation: baseRotation,
+		duration: 0.2,
+		ease: 'power2.out',
+	});
 }

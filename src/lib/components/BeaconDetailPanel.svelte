@@ -662,7 +662,7 @@
 				<div>
 					<p class="text-xs font-medium text-emerald-400 uppercase tracking-wider mb-1.5" style="font-family: 'Satoshi', sans-serif;">Going</p>
 					<div class="flex flex-wrap gap-1.5">
-						{#each joining as person}
+						{#each joining as person (person.userId)}
 							<button
 								class="lego-chip lego-chip-emerald cursor-pointer"
 								onclick={() => onNavigateToUser?.(person.userId, person.displayName)}
@@ -676,7 +676,7 @@
 				<div>
 					<p class="text-xs font-medium text-amber-400 uppercase tracking-wider mb-1.5" style="font-family: 'Satoshi', sans-serif;">Interested</p>
 					<div class="flex flex-wrap gap-1.5">
-						{#each interested as person}
+						{#each interested as person (person.userId)}
 							<button
 								class="lego-chip lego-chip-amber cursor-pointer"
 								onclick={() => onNavigateToUser?.(person.userId, person.displayName)}

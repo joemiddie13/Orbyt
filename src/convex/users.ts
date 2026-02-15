@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { authComponent } from "./auth";
 
 /** Characters for friend codes — no ambiguous chars (0/O/1/l/I) */
@@ -7,7 +8,7 @@ const FRIEND_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz234567
 const FRIEND_CODE_LENGTH = 10;
 
 /** Generate a random friend code, collision-checked against the database */
-async function generateFriendCode(ctx: any): Promise<string> {
+async function generateFriendCode(ctx: MutationCtx): Promise<string> {
 	for (let attempt = 0; attempt < 10; attempt++) {
 		let code = "";
 		for (let i = 0; i < FRIEND_CODE_LENGTH; i++) {
@@ -15,7 +16,7 @@ async function generateFriendCode(ctx: any): Promise<string> {
 		}
 		const existing = await ctx.db
 			.query("users")
-			.withIndex("by_friend_code", (q: any) => q.eq("friendCode", code))
+			.withIndex("by_friend_code", (q) => q.eq("friendCode", code))
 			.first();
 		if (!existing) return code;
 	}
@@ -23,13 +24,13 @@ async function generateFriendCode(ctx: any): Promise<string> {
 }
 
 /** Verify the caller is authenticated and return their Astrophage user */
-export async function getAuthenticatedUser(ctx: any) {
+export async function getAuthenticatedUser(ctx: QueryCtx | MutationCtx) {
 	const authUser = await authComponent.getAuthUser(ctx).catch(() => null);
 	if (!authUser) throw new Error("Not authenticated");
 
 	const user = await ctx.db
 		.query("users")
-		.withIndex("by_auth_account", (q: any) => q.eq("authAccountId", authUser._id))
+		.withIndex("by_auth_account", (q) => q.eq("authAccountId", authUser._id))
 		.first();
 	if (!user) throw new Error("User not found");
 

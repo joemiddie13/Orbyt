@@ -56,7 +56,7 @@
 
 			<div class="space-y-2">
 				{#if members.data}
-					{#each members.data as member}
+					{#each members.data as member (member?.uuid ?? '')}
 						{#if member}
 							<div class="flex items-center gap-3 py-2">
 								<div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-sm font-medium">

@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import { gsap } from '../gsapInit';
-import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
+import { makeDraggable, makeLongPressable, makeTappable, animateDragLift, animateDragDrop } from '../interactions/DragDrop';
 
 /**
  * PhotoObject — a Polaroid-style photo on the canvas.
@@ -120,11 +120,8 @@ export class PhotoObject {
 
 		// Tap handler
 		if (options.onTap) {
-			let didMove = false;
-			this.container.on('pointerdown', () => { didMove = false; });
-			this.container.on('globalpointermove', () => { didMove = true; });
-			this.container.on('pointerup', () => {
-				if (!didMove && this.objectId) options.onTap!(this.objectId);
+			makeTappable(this.container, () => {
+				if (this.objectId) options.onTap!(this.objectId);
 			});
 		}
 
@@ -219,65 +216,14 @@ export class PhotoObject {
 		}
 	}
 
-	// ── Drag animations ─────────────────────────────────────────────────
+	// ── Drag animations (delegated to shared utilities) ─────────────────
 
-	/** Lift photo off canvas — scale up + tilt away from base rotation */
 	animateDragLift() {
-		gsap.killTweensOf(this.container.scale);
-		gsap.killTweensOf(this.container);
-
-		this.liftRotation = (Math.random() > 0.5 ? 1 : -1) * (0.02 + Math.random() * 0.02);
-
-		const tl = gsap.timeline();
-		tl.to(this.container.scale, {
-			x: 1.05, y: 1.05,
-			duration: 0.2,
-			ease: 'power2.out',
-		}, 0);
-		tl.to(this.container, {
-			rotation: this.baseRotation + this.liftRotation,
-			duration: 0.25,
-			ease: 'power2.out',
-		}, 0);
+		this.liftRotation = animateDragLift(this.container, this.baseRotation);
 	}
 
-	/** Drop photo back — squash-stretch impact + wobble settling to base rotation */
 	animateDragDrop() {
-		gsap.killTweensOf(this.container.scale);
-		gsap.killTweensOf(this.container);
-
-		const tl = gsap.timeline();
-
-		// Squash on impact
-		tl.to(this.container.scale, {
-			x: 1.03, y: 0.97,
-			duration: 0.1,
-			ease: 'power2.in',
-		});
-
-		// Spring back to 1.0
-		tl.to(this.container.scale, {
-			x: 1, y: 1,
-			duration: 0.3,
-			ease: 'elastic.out(1, 0.4)',
-		});
-
-		// Wobble rotation back to base tilt
-		tl.to(this.container, {
-			rotation: this.baseRotation - this.liftRotation * 0.5,
-			duration: 0.12,
-			ease: 'power2.inOut',
-		}, 0);
-		tl.to(this.container, {
-			rotation: this.baseRotation + this.liftRotation * 0.25,
-			duration: 0.15,
-			ease: 'sine.inOut',
-		});
-		tl.to(this.container, {
-			rotation: this.baseRotation,
-			duration: 0.2,
-			ease: 'power2.out',
-		});
+		animateDragDrop(this.container, this.liftRotation, this.baseRotation);
 	}
 
 	/** Kill all running GSAP tweens — call before removal */

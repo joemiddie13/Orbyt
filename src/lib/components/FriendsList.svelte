@@ -58,7 +58,7 @@
 			{#if pendingRequests.data && pendingRequests.data.length > 0}
 				<div class="mb-5">
 					<p class="text-xs font-medium text-white/40 uppercase tracking-wider mb-2">Pending Requests</p>
-					{#each pendingRequests.data as req}
+					{#each pendingRequests.data as req (req?.friendshipId ?? '')}
 						{#if req}
 							<div class="flex items-center justify-between py-2">
 								<div>
@@ -91,7 +91,7 @@
 			{#if friends.data && friends.data.length > 0}
 				<div>
 					<p class="text-xs font-medium text-white/40 uppercase tracking-wider mb-2">Connected</p>
-					{#each friends.data as friend}
+					{#each friends.data as friend (friend.uuid)}
 						<div class="flex items-center gap-3 py-2">
 							<div class="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-sm font-medium">
 								{friend.displayName.charAt(0).toUpperCase()}

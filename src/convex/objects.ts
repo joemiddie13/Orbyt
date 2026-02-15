@@ -1,23 +1,19 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { authComponent } from "./auth";
 import { getAuthenticatedUser } from "./users";
 import { areFriends } from "./friendships";
 import { checkCanvasAccess } from "./access";
-
-/** Canvas bounds — objects must stay within these limits */
-const CANVAS_MAX_X = 3000;
-const CANVAS_MAX_Y = 2000;
-const MAX_OBJECT_SIZE = 1000;
-const MAX_TEXT_LENGTH = 10000;
-const MAX_TITLE_LENGTH = 200;
-
-/** Validate position is within canvas bounds */
-function validatePosition(position: { x: number; y: number }) {
-	if (position.x < 0 || position.x > CANVAS_MAX_X || position.y < 0 || position.y > CANVAS_MAX_Y) {
-		throw new Error(`Position must be within canvas bounds (0–${CANVAS_MAX_X}, 0–${CANVAS_MAX_Y})`);
-	}
-}
+import {
+	validatePosition,
+	validateSize,
+	validateBeaconTiming,
+	validateBeaconContent,
+	MAX_TEXT_LENGTH,
+	MAX_NOTE_TITLE_LENGTH,
+	MAX_OBJECT_SIZE,
+} from "./validators";
 
 /** Content validator for textblock type */
 const textblockContent = v.object({
@@ -78,7 +74,7 @@ export const getByCanvas = query({
 			objects.map(async (obj) => {
 				if (obj.type === "photo") {
 					const content = obj.content as { storageId: string; caption?: string; rotation: number };
-					const imageUrl = await ctx.storage.getUrl(content.storageId as any);
+					const imageUrl = await ctx.storage.getUrl(content.storageId as Id<"_storage">);
 					return { ...obj, content: { ...content, imageUrl } };
 				}
 				return obj;
@@ -102,9 +98,7 @@ export const create = mutation({
 
 		// Validate bounds
 		validatePosition(args.position);
-		if (args.size.w <= 0 || args.size.w > MAX_OBJECT_SIZE || args.size.h <= 0 || args.size.h > MAX_OBJECT_SIZE) {
-			throw new Error(`Object size must be between 1 and ${MAX_OBJECT_SIZE}`);
-		}
+		validateSize(args.size);
 
 		// Verify caller has member+ access to the canvas
 		await checkCanvasAccess(ctx, args.canvasId, user.uuid, "member");
@@ -115,34 +109,16 @@ export const create = mutation({
 			if (!content.text || content.text.length < 1 || content.text.length > MAX_TEXT_LENGTH) {
 				throw new Error(`Text must be 1–${MAX_TEXT_LENGTH} characters`);
 			}
-			if (content.title && content.title.length > 100) {
-				throw new Error("Note title must be 100 characters or less");
+			if (content.title && content.title.length > MAX_NOTE_TITLE_LENGTH) {
+				throw new Error(`Note title must be ${MAX_NOTE_TITLE_LENGTH} characters or less`);
 			}
 		} else if (args.type === "beacon") {
 			const content = args.content as {
 				title: string; description?: string; locationAddress?: string;
 				startTime: number; endTime: number;
 			};
-			if (!content.title || content.title.length < 1 || content.title.length > MAX_TITLE_LENGTH) {
-				throw new Error(`Title must be 1–${MAX_TITLE_LENGTH} characters`);
-			}
-			if (content.description && content.description.length > 1000) {
-				throw new Error("Description must be 1000 characters or less");
-			}
-			if (content.locationAddress && content.locationAddress.length > 500) {
-				throw new Error("Location must be 500 characters or less");
-			}
-			if (content.startTime >= content.endTime) {
-				throw new Error("Start time must be before end time");
-			}
-			const now = Date.now();
-			const MAX_BEACON_DURATION = 90 * 24 * 60 * 60 * 1000; // 90 days
-			if (content.startTime < now - 60_000) {
-				throw new Error("Start time cannot be in the past");
-			}
-			if (content.endTime - content.startTime > MAX_BEACON_DURATION) {
-				throw new Error("Beacon duration cannot exceed 90 days");
-			}
+			validateBeaconContent(content);
+			validateBeaconTiming(content.startTime, content.endTime);
 		}
 
 		return ctx.db.insert("canvasObjects", {
@@ -194,8 +170,8 @@ export const updateContent = mutation({
 		if (!args.content.text || args.content.text.length < 1 || args.content.text.length > MAX_TEXT_LENGTH) {
 			throw new Error(`Text must be 1–${MAX_TEXT_LENGTH} characters`);
 		}
-		if (args.content.title && args.content.title.length > 100) {
-			throw new Error("Note title must be 100 characters or less");
+		if (args.content.title && args.content.title.length > MAX_NOTE_TITLE_LENGTH) {
+			throw new Error(`Note title must be ${MAX_NOTE_TITLE_LENGTH} characters or less`);
 		}
 
 		await ctx.db.patch(args.id, { content: args.content });
@@ -216,9 +192,7 @@ export const updateSize = mutation({
 
 		await checkCanvasAccess(ctx, obj.canvasId, user.uuid, "member");
 
-		if (args.size.w <= 0 || args.size.w > MAX_OBJECT_SIZE || args.size.h <= 0 || args.size.h > MAX_OBJECT_SIZE) {
-			throw new Error(`Object size must be between 1 and ${MAX_OBJECT_SIZE}`);
-		}
+		validateSize(args.size);
 
 		await ctx.db.patch(args.id, { size: args.size });
 	},

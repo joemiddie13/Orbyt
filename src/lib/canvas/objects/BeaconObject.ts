@@ -1,6 +1,6 @@
 import { Container, Graphics, Rectangle, Sprite, Text, Texture, TextStyle } from 'pixi.js';
 import { gsap } from '../gsapInit';
-import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
+import { makeDraggable, makeLongPressable, makeTappable } from '../interactions/DragDrop';
 
 /**
  * BeaconObject — a living broadcast signal on the canvas.
@@ -322,13 +322,8 @@ export class BeaconObject {
 
 		// Tap handler
 		if (options.onTap) {
-			let didMove = false;
-			this.container.on('pointerdown', () => { didMove = false; });
-			this.container.on('globalpointermove', () => { didMove = true; });
-			this.container.on('pointerup', () => {
-				if (!didMove && this.objectId) {
-					options.onTap!(this.objectId);
-				}
+			makeTappable(this.container, () => {
+				if (this.objectId) options.onTap!(this.objectId);
 			});
 		}
 

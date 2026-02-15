@@ -45,30 +45,35 @@ export const createSharedCanvas = mutation({
 			bounds: { width: 3000, height: 2000 },
 		});
 
-		// Grant access to invited friends
-		for (const inviteeUuid of args.inviteUuids) {
-			// Verify friendship exists
-			const forwardFriendship = await ctx.db
-				.query("friendships")
-				.withIndex("by_pair", (q) => q.eq("requesterId", user.uuid).eq("receiverId", inviteeUuid))
-				.filter((q) => q.eq(q.field("status"), "accepted"))
-				.first();
-			const reverseFriendship = await ctx.db
-				.query("friendships")
-				.withIndex("by_pair", (q) => q.eq("requesterId", inviteeUuid).eq("receiverId", user.uuid))
-				.filter((q) => q.eq(q.field("status"), "accepted"))
-				.first();
+		// Verify all friendships in parallel
+		const friendshipResults = await Promise.all(
+			args.inviteUuids.map(async (inviteeUuid) => {
+				const [fwd, rev] = await Promise.all([
+					ctx.db.query("friendships")
+						.withIndex("by_pair", (q) => q.eq("requesterId", user.uuid).eq("receiverId", inviteeUuid))
+						.filter((q) => q.eq(q.field("status"), "accepted"))
+						.first(),
+					ctx.db.query("friendships")
+						.withIndex("by_pair", (q) => q.eq("requesterId", inviteeUuid).eq("receiverId", user.uuid))
+						.filter((q) => q.eq(q.field("status"), "accepted"))
+						.first(),
+				]);
+				return { inviteeUuid, isFriend: !!(fwd || rev) };
+			})
+		);
 
-			if (forwardFriendship || reverseFriendship) {
-				await ctx.db.insert("canvasAccess", {
+		// Grant access to verified friends in parallel
+		await Promise.all(
+			friendshipResults
+				.filter((r) => r.isFriend)
+				.map((r) => ctx.db.insert("canvasAccess", {
 					canvasId,
-					userId: inviteeUuid,
+					userId: r.inviteeUuid,
 					role: "member",
 					invitedBy: user.uuid,
 					invitedAt: Date.now(),
-				});
-			}
-		}
+				}))
+		);
 
 		return canvasId;
 	},

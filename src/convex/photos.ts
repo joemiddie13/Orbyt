@@ -1,14 +1,13 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { mutation } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
 import { checkCanvasAccess } from "./access";
+import { validatePosition, MAX_CAPTION_LENGTH } from "./validators";
 
 /** Max file size: 5MB */
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const MAX_CAPTION_LENGTH = 200;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const CANVAS_MAX_X = 3000;
-const CANVAS_MAX_Y = 2000;
 
 /** Generate a one-time upload URL for Convex file storage */
 export const generateUploadUrl = mutation({
@@ -31,13 +30,10 @@ export const createPhoto = mutation({
 		const user = await getAuthenticatedUser(ctx);
 		await checkCanvasAccess(ctx, args.canvasId, user.uuid, "member");
 
-		// Validate position within canvas bounds
-		if (args.position.x < 0 || args.position.x > CANVAS_MAX_X || args.position.y < 0 || args.position.y > CANVAS_MAX_Y) {
-			throw new Error("Position must be within canvas bounds");
-		}
+		validatePosition(args.position);
 
 		// Validate the storage ID refers to a real file
-		const metadata = await ctx.storage.getMetadata(args.storageId as any);
+		const metadata = await ctx.storage.getMetadata(args.storageId as Id<"_storage">);
 		if (!metadata) throw new Error("Invalid storage ID");
 		if (metadata.size > MAX_FILE_SIZE) {
 			throw new Error("File too large (max 5MB)");

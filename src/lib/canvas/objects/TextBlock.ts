@@ -1,6 +1,6 @@
 import { Container, Graphics, HTMLText, HTMLTextStyle, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
 import { gsap } from '../gsapInit';
-import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
+import { makeDraggable, makeLongPressable, makeTappable, animateDragLift, animateDragDrop } from '../interactions/DragDrop';
 
 /**
  * TextBlock — a sticky-note-style object on the canvas.
@@ -209,13 +209,8 @@ export class TextBlock {
 
 		// Tap handler for viewing/editing note details (works for all users)
 		if (options.onTap) {
-			let didMove = false;
-			this.container.on('pointerdown', () => { didMove = false; });
-			this.container.on('globalpointermove', () => { didMove = true; });
-			this.container.on('pointerup', () => {
-				if (!didMove && this.objectId) {
-					options.onTap!(this.objectId);
-				}
+			makeTappable(this.container, () => {
+				if (this.objectId) options.onTap!(this.objectId);
 			});
 		}
 
@@ -546,69 +541,17 @@ export class TextBlock {
 		this.updateResizeZones();
 	}
 
-	// ── Drag animations ─────────────────────────────────────────────────
+	// ── Drag animations (delegated to shared utilities) ─────────────────
 
-	/** Tilt direction randomized per lift — paper doesn't always tilt the same way */
+	/** Random tilt delta added during drag lift */
 	private liftRotation = 0;
 
-	/** Lift note off the canvas like peeling paper — scale up + slight rotation tilt */
 	animateDragLift() {
-		gsap.killTweensOf(this.container.scale);
-		gsap.killTweensOf(this.container);
-
-		// Random tilt direction: slight rotation like picking up a corner
-		this.liftRotation = (Math.random() > 0.5 ? 1 : -1) * (0.02 + Math.random() * 0.02);
-
-		const tl = gsap.timeline();
-		tl.to(this.container.scale, {
-			x: 1.05, y: 1.05,
-			duration: 0.2,
-			ease: 'power2.out',
-		}, 0);
-		tl.to(this.container, {
-			rotation: this.liftRotation,
-			duration: 0.25,
-			ease: 'power2.out',
-		}, 0);
+		this.liftRotation = animateDragLift(this.container);
 	}
 
-	/** Drop note back onto the canvas — squash-stretch impact + paper wobble settling */
 	animateDragDrop() {
-		gsap.killTweensOf(this.container.scale);
-		gsap.killTweensOf(this.container);
-
-		const tl = gsap.timeline();
-
-		// Squash on impact: slightly wider + shorter
-		tl.to(this.container.scale, {
-			x: 1.03, y: 0.97,
-			duration: 0.1,
-			ease: 'power2.in',
-		});
-
-		// Stretch back and settle to 1.0
-		tl.to(this.container.scale, {
-			x: 1, y: 1,
-			duration: 0.3,
-			ease: 'elastic.out(1, 0.4)',
-		});
-
-		// Paper wobble: rotation oscillates back to 0
-		tl.to(this.container, {
-			rotation: -this.liftRotation * 0.5,
-			duration: 0.12,
-			ease: 'power2.inOut',
-		}, 0);
-		tl.to(this.container, {
-			rotation: this.liftRotation * 0.25,
-			duration: 0.15,
-			ease: 'sine.inOut',
-		});
-		tl.to(this.container, {
-			rotation: 0,
-			duration: 0.2,
-			ease: 'power2.out',
-		});
+		animateDragDrop(this.container, this.liftRotation);
 	}
 
 	// ── Edit mode animations ────────────────────────────────────────────

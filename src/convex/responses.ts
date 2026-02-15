@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
 import { checkCanvasAccess } from "./access";
@@ -122,16 +123,17 @@ export const getByBeaconGroup = query({
 
 		if (groupBeacons.length === 0) return [];
 
-		// Filter to only beacons the caller can actually access (per-beacon check)
-		const accessibleBeacons = [];
-		for (const beacon of groupBeacons) {
-			try {
-				await checkCanvasAccess(ctx, beacon.canvasId, user.uuid, "viewer");
-				accessibleBeacons.push(beacon);
-			} catch {
-				// Caller can't see this copy — skip it
-			}
-		}
+		// Filter to only beacons the caller can actually access (parallel check)
+		const accessibleBeacons = (await Promise.all(
+			groupBeacons.map(async (beacon) => {
+				try {
+					await checkCanvasAccess(ctx, beacon.canvasId, user.uuid, "viewer");
+					return beacon;
+				} catch {
+					return null;
+				}
+			})
+		)).filter((b): b is NonNullable<typeof b> => b !== null);
 		if (accessibleBeacons.length === 0) return [];
 
 		// Aggregate responses only from accessible beacons
@@ -145,7 +147,7 @@ export const getByBeaconGroup = query({
 		);
 
 		// Dedupe by userId (keep latest response)
-		const byUser = new Map<string, any>();
+		const byUser = new Map<string, Doc<"beaconResponses">>();
 		for (const responses of allResponses) {
 			for (const resp of responses) {
 				const existing = byUser.get(resp.userId);

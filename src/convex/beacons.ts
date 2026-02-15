@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./users";
 import { checkCanvasAccess } from "./access";
+import { validateBeaconContent, validateBeaconTiming } from "./validators";
 
 /** Get active (non-expired) beacons on a canvas */
 export const getActiveBeacons = query({
@@ -39,28 +40,22 @@ export const cleanupExpired = internalMutation({
 			.withIndex("by_type_expires", (q) => q.eq("type", "beacon").lt("expiresAt", now))
 			.collect();
 
-		for (const beacon of expiredBeacons) {
-			// Delete associated responses
-			const responses = await ctx.db
-				.query("beaconResponses")
-				.withIndex("by_beacon", (q) => q.eq("beaconId", beacon._id))
-				.collect();
-			for (const resp of responses) {
-				await ctx.db.delete(resp._id);
-			}
-
-			// Delete associated stickers
-			const stickers = await ctx.db
-				.query("stickerReactions")
-				.withIndex("by_object", (q) => q.eq("objectId", beacon._id))
-				.collect();
-			for (const sticker of stickers) {
-				await ctx.db.delete(sticker._id);
-			}
-
-			// Delete the beacon itself
-			await ctx.db.delete(beacon._id);
-		}
+		// Cascade-delete all expired beacons and associated data in parallel
+		await Promise.all(expiredBeacons.map(async (beacon) => {
+			const [responses, stickers] = await Promise.all([
+				ctx.db.query("beaconResponses")
+					.withIndex("by_beacon", (q) => q.eq("beaconId", beacon._id))
+					.collect(),
+				ctx.db.query("stickerReactions")
+					.withIndex("by_object", (q) => q.eq("objectId", beacon._id))
+					.collect(),
+			]);
+			await Promise.all([
+				...responses.map((r) => ctx.db.delete(r._id)),
+				...stickers.map((s) => ctx.db.delete(s._id)),
+				ctx.db.delete(beacon._id),
+			]);
+		}));
 
 		return { cleaned: expiredBeacons.length };
 	},
@@ -78,7 +73,7 @@ export const backfillBeaconGroupIds = internalMutation({
 		let patched = 0;
 		for (const beacon of beacons) {
 			if (beacon.directBeaconGroupId) continue; // already has it
-			const content = beacon.content as any;
+			const content = beacon.content as { directBeaconGroupId?: string };
 			if (content.directBeaconGroupId) {
 				await ctx.db.patch(beacon._id, {
 					directBeaconGroupId: content.directBeaconGroupId,
@@ -121,26 +116,8 @@ export const createDirectBeacon = mutation({
 			throw new Error("Rate limit: max 10 direct beacons per hour");
 		}
 
-		if (args.title.length < 1 || args.title.length > 200) {
-			throw new Error("Title must be 1–200 characters");
-		}
-		if (args.description && args.description.length > 1000) {
-			throw new Error("Description must be 1000 characters or less");
-		}
-		if (args.locationAddress && args.locationAddress.length > 500) {
-			throw new Error("Location must be 500 characters or less");
-		}
-		if (args.startTime >= args.endTime) {
-			throw new Error("Start time must be before end time");
-		}
-		const now = Date.now();
-		const MAX_BEACON_DURATION = 90 * 24 * 60 * 60 * 1000; // 90 days
-		if (args.startTime < now - 60_000) {
-			throw new Error("Start time cannot be in the past");
-		}
-		if (args.endTime - args.startTime > MAX_BEACON_DURATION) {
-			throw new Error("Beacon duration cannot exceed 90 days");
-		}
+		validateBeaconContent({ title: args.title, description: args.description, locationAddress: args.locationAddress });
+		validateBeaconTiming(args.startTime, args.endTime);
 		if (args.recipientUuids.length === 0) {
 			throw new Error("Must have at least one recipient");
 		}

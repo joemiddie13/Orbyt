@@ -903,7 +903,7 @@
 			<!-- Line 5: Friend chips (direct mode) -->
 			{#if visibilityType === 'direct' && friends.data && friends.data.length > 0}
 				<div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-					{#each friends.data as friend}
+					{#each friends.data as friend (friend.uuid)}
 						<button
 							onclick={() => toggleRecipient(friend.uuid)}
 							class="friend-chip cursor-pointer {selectedRecipients.has(friend.uuid) ? 'selected' : ''}"

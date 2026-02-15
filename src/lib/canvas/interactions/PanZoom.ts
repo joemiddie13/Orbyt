@@ -52,6 +52,9 @@ export class PanZoom {
 	private velocityX = 0;
 	private velocityY = 0;
 
+	// Stored listener for cleanup
+	private wheelListener: ((event: WheelEvent) => void) | null = null;
+
 	constructor(app: Application, world: Container, canvasWidth: number, canvasHeight: number) {
 		this.app = app;
 		this.world = world;
@@ -185,7 +188,7 @@ export class PanZoom {
 	 * the top-right, it zooms into the top-right (like Google Maps).
 	 */
 	private setupZoom() {
-		this.app.canvas.addEventListener('wheel', (event: WheelEvent) => {
+		this.wheelListener = (event: WheelEvent) => {
 			event.preventDefault();
 			if (this.locked) return;
 
@@ -208,7 +211,16 @@ export class PanZoom {
 
 			this.world.x = pointerX - worldPosBeforeX * newScale;
 			this.world.y = pointerY - worldPosBeforeY * newScale;
-		}, { passive: false });
+		};
+		this.app.canvas.addEventListener('wheel', this.wheelListener, { passive: false });
+	}
+
+	/** Clean up event listeners — call when destroying the renderer */
+	destroy() {
+		if (this.wheelListener) {
+			this.app.canvas.removeEventListener('wheel', this.wheelListener);
+			this.wheelListener = null;
+		}
 	}
 
 	/**

@@ -32,16 +32,27 @@ const CURSOR_COLORS = [
 const CURSOR_FADE_MS = 3000; // Fade out after 3s no update
 const CURSOR_HIDE_MS = 5000; // Remove after 5s
 
-/** Shape of a canvas object from Convex */
-export interface CanvasObjectData {
+/** Content shape for textblock objects */
+export interface TextBlockContent {
+	text: string;
+	color: number;
+	title?: string;
+}
+
+/** Base fields shared by all canvas objects */
+interface CanvasObjectBase {
 	_id: string;
-	type: string;
 	position: { x: number; y: number };
 	size: { w: number; h: number };
-	content: any;
 	expiresAt?: number;
 	creatorId?: string;
 }
+
+/** Discriminated union of all canvas object types from Convex */
+export type CanvasObjectData =
+	| (CanvasObjectBase & { type: "textblock"; content: TextBlockContent })
+	| (CanvasObjectBase & { type: "beacon"; content: BeaconContent })
+	| (CanvasObjectBase & { type: "photo"; content: PhotoContent });
 
 export class CanvasRenderer {
 	app: Application;
@@ -175,10 +186,10 @@ export class CanvasRenderer {
 
 				// Update text content, color, and title for notes
 				if (obj.type === 'textblock' && existing instanceof TextBlock) {
-					existing.updateText(obj.content?.text ?? '');
-					existing.updateColor(obj.content?.color ?? 0xfff9c4);
-					existing.updateTitle(obj.content?.title ?? '');
-					existing.updateSize(obj.size?.w ?? 240, obj.size?.h ?? 0);
+					existing.updateText(obj.content.text ?? '');
+					existing.updateColor(obj.content.color ?? 0xfff9c4);
+					existing.updateTitle(obj.content.title ?? '');
+					existing.updateSize(obj.size.w ?? 240, obj.size.h ?? 0);
 				}
 
 				// Update expired state for beacons
@@ -190,21 +201,18 @@ export class CanvasRenderer {
 
 				// Update caption for photos
 				if (obj.type === 'photo' && existing instanceof PhotoObject) {
-					const content = obj.content as PhotoContent;
-					existing.updateCaption(content.caption ?? '');
+					existing.updateCaption(obj.content.caption ?? '');
 				}
 			} else if (obj.type === 'textblock') {
-				const color = obj.content?.color ?? 0xfff9c4;
-				const text = obj.content?.text ?? '';
-				const title = obj.content?.title ?? '';
+				const { color = 0xfff9c4, text = '', title = '' } = obj.content;
 				// Suppress individual pop-in during bulk load — stagger handles it
 				const shouldAnimate = isBulkLoad ? false : animate;
 				const block = new TextBlock(text, obj.position.x, obj.position.y, color, {
 					objectId: obj._id,
 					editable: this.editable,
 					animate: shouldAnimate,
-					initialWidth: obj.size?.w ?? 240,
-					initialHeight: obj.size?.h ?? 0,
+					initialWidth: obj.size.w ?? 240,
+					initialHeight: obj.size.h ?? 0,
 					onDragStart: (id) => this.onObjectDragStart?.(id),
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
 					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
@@ -216,7 +224,7 @@ export class CanvasRenderer {
 				this.objects.set(obj._id, block);
 				if (isBulkLoad) newContainers.push(block.container);
 			} else if (obj.type === 'beacon') {
-				const content = obj.content as BeaconContent;
+				const content = obj.content;
 				const isExpired = obj.expiresAt ? obj.expiresAt < Date.now() : false;
 				const shouldAnimate = isBulkLoad ? false : animate;
 				const beacon = new BeaconObject(content, obj.position.x, obj.position.y, {
@@ -233,7 +241,7 @@ export class CanvasRenderer {
 				this.objects.set(obj._id, beacon);
 				if (isBulkLoad) newContainers.push(beacon.container);
 			} else if (obj.type === 'photo') {
-				const content = obj.content as PhotoContent;
+				const content = obj.content;
 				const shouldAnimate = isBulkLoad ? false : animate;
 				const photo = new PhotoObject(content, obj.position.x, obj.position.y, {
 					objectId: obj._id,
@@ -572,6 +580,7 @@ export class CanvasRenderer {
 
 	destroy() {
 		this.removeAllRemoteCursors();
+		this.panZoom.destroy();
 		this.starField.destroy();
 		this.app.destroy(true, { children: true });
 	}
