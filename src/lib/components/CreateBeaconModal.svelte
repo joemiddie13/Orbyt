@@ -803,6 +803,7 @@
 	onmousedown={handleMouseDown}
 	onmouseup={handleMouseUp}
 	style:cursor={grabbed ? 'grabbing' : parallaxActive ? 'grab' : undefined}
+	style:user-select={grabbed ? 'none' : undefined}
 >
 	<div bind:this={panel} class="glass-panel rounded-2xl w-full max-w-md mx-4 overflow-hidden max-h-[85vh] flex flex-col relative" style="will-change: transform, box-shadow;">
 
