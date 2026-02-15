@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Application, Container, Graphics, Rectangle, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
 import './gsapInit'; // Ensure GSAP + PixiPlugin registered before any object creation
 import { gsap } from './gsapInit';
 import { PanZoom } from './interactions/PanZoom';
@@ -105,6 +105,9 @@ export class CanvasRenderer {
 
 	/** Callback for long-press on any object (sticker picker) */
 	onObjectLongPress?: (objectId: string, screenX: number, screenY: number) => void;
+
+	/** Callback for visitor sticker selection (inline emoji menu) */
+	onStickerSelected?: (objectId: string, stickerType: string) => void;
 
 	/** Callback for when an object is resized (includes final position for left/top resize) */
 	onObjectResized?: (objectId: string, x: number, y: number, width: number, height: number) => void;
@@ -222,6 +225,7 @@ export class CanvasRenderer {
 				}, title);
 				this.world.addChild(block.container);
 				this.objects.set(obj._id, block);
+				if (!this.editable) block.container.addChild(this.createStickerButton(obj._id, obj.size.w ?? 240));
 				if (isBulkLoad) newContainers.push(block.container);
 			} else if (obj.type === 'beacon') {
 				const content = obj.content;
@@ -239,6 +243,7 @@ export class CanvasRenderer {
 				});
 				this.world.addChild(beacon.container);
 				this.objects.set(obj._id, beacon);
+				if (!this.editable) beacon.container.addChild(this.createStickerButton(obj._id, obj.size.w ?? 200));
 				if (isBulkLoad) newContainers.push(beacon.container);
 			} else if (obj.type === 'photo') {
 				const content = obj.content;
@@ -255,6 +260,7 @@ export class CanvasRenderer {
 				});
 				this.world.addChild(photo.container);
 				this.objects.set(obj._id, photo);
+				if (!this.editable) photo.container.addChild(this.createStickerButton(obj._id, obj.size.w ?? 260));
 				if (isBulkLoad) newContainers.push(photo.container);
 			}
 		}
@@ -576,6 +582,276 @@ export class CanvasRenderer {
 			repeat: -1,
 			yoyo: true,
 		});
+	}
+
+	/**
+	 * Create an inline sticker reaction menu for visitor-mode objects.
+	 * Amber trigger circle with smiley — hover to fan out emoji options.
+	 */
+	private createStickerButton(objectId: string, objectWidth: number): Container {
+		const STICKERS = [
+			{ type: 'heart', emoji: '\u2764\uFE0F' },
+			{ type: 'fire', emoji: '\uD83D\uDD25' },
+			{ type: 'laugh', emoji: '\uD83D\uDE02' },
+			{ type: 'wave', emoji: '\uD83D\uDC4B' },
+			{ type: 'star', emoji: '\u2B50' },
+			{ type: '100', emoji: '\uD83D\uDCAF' },
+			{ type: 'thumbs-up', emoji: '\uD83D\uDC4D' },
+			{ type: 'eyes', emoji: '\uD83D\uDC40' },
+		];
+
+		const SIZE = 30;
+		const HALF = SIZE / 2;
+		const SLOT = 34;        // width per emoji slot
+		const PAD = 10;         // padding inside menu bar ends
+		const MENU_GAP = 4;     // gap between trigger circle and menu bar
+
+		const BAR_W = PAD * 2 + STICKERS.length * SLOT;  // total bar width
+		const BAR_H = SLOT;                                // bar height
+		const BAR_R = BAR_H / 2;                           // fully rounded pill ends
+
+		type Dir = 'left' | 'right' | 'up' | 'down';
+		const DIRS: Dir[] = ['left', 'right', 'up', 'down'];
+
+		// Emoji target position for a given direction
+		function emojiTarget(i: number, dir: Dir) {
+			const offset = MENU_GAP + PAD + SLOT * (i + 0.5);
+			switch (dir) {
+				case 'left':  return { x: -offset, y: 0 };
+				case 'right': return { x: offset, y: 0 };
+				case 'up':    return { x: 0, y: -offset };
+				case 'down':  return { x: 0, y: offset };
+			}
+		}
+
+		// Hit area that covers trigger + expanded menu for a direction
+		function dirHitArea(dir: Dir) {
+			const reach = BAR_W + MENU_GAP;
+			switch (dir) {
+				case 'left':
+					return new Rectangle(-reach - 4, -BAR_H / 2 - 4, reach + HALF + 8, BAR_H + 8);
+				case 'right':
+					return new Rectangle(-HALF - 4, -BAR_H / 2 - 4, reach + HALF + 8, BAR_H + 8);
+				case 'up':
+					return new Rectangle(-BAR_H / 2 - 4, -reach - 4, BAR_H + 8, reach + HALF + 8);
+				case 'down':
+					return new Rectangle(-BAR_H / 2 - 4, -HALF - 4, BAR_H + 8, reach + HALF + 8);
+			}
+		}
+
+		// Redraw menu bar graphics for a direction
+		function drawBar(dir: Dir) {
+			menuBar.clear();
+			const isH = dir === 'left' || dir === 'right';
+			const sign = (dir === 'left' || dir === 'up') ? -1 : 1;
+			if (isH) {
+				const rx = sign > 0 ? 0 : -BAR_W;
+				menuBar.roundRect(rx, -BAR_H / 2, BAR_W, BAR_H, BAR_R);
+				menuBar.fill({ color: 0x0f0e1a, alpha: 0.82 });
+				menuBar.roundRect(rx, -BAR_H / 2, BAR_W, BAR_H, BAR_R);
+				menuBar.stroke({ width: 1, color: 0xffffff, alpha: 0.08 });
+				menuBar.x = sign * MENU_GAP;
+				menuBar.y = 0;
+			} else {
+				const ry = sign > 0 ? 0 : -BAR_W;
+				menuBar.roundRect(-BAR_H / 2, ry, BAR_H, BAR_W, BAR_R);
+				menuBar.fill({ color: 0x0f0e1a, alpha: 0.82 });
+				menuBar.roundRect(-BAR_H / 2, ry, BAR_H, BAR_W, BAR_R);
+				menuBar.stroke({ width: 1, color: 0xffffff, alpha: 0.08 });
+				menuBar.x = 0;
+				menuBar.y = sign * MENU_GAP;
+			}
+		}
+
+		// Hit areas: collapsed (trigger only)
+		const TRIGGER_HIT = new Rectangle(-HALF - 4, -HALF - 4, SIZE + 8, SIZE + 8);
+
+		const btn = new Container();
+		btn.eventMode = 'static';
+		btn.cursor = 'pointer';
+		btn.hitArea = TRIGGER_HIT;
+
+		// Position at top-right corner of object
+		btn.x = objectWidth - 2;
+		btn.y = -4;
+
+		let expanded = false;
+		let expandTl: gsap.core.Timeline | null = null;
+
+		// ── Trigger circle ──────────────────────────────────────────────
+
+		const triggerShadow = new Graphics();
+		triggerShadow.circle(1, 2, HALF);
+		triggerShadow.fill({ color: 0x000000, alpha: 0.2 });
+		btn.addChild(triggerShadow);
+
+		const triggerBg = new Graphics();
+		triggerBg.circle(0, 0, HALF);
+		triggerBg.fill(0xfbbf24);
+		triggerBg.circle(0, 0, HALF);
+		triggerBg.stroke({ width: 1.5, color: 0xf59e0b });
+		btn.addChild(triggerBg);
+
+		const triggerEmoji = new Text({
+			text: '\uD83D\uDC40',
+			style: new TextStyle({ fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif' }),
+		});
+		triggerEmoji.anchor.set(0.5, 0.5);
+		triggerEmoji.y = -1;
+		btn.addChild(triggerEmoji);
+
+		// ── Emoji option circles ────────────────────────────────────────
+
+		const options: Container[] = [];
+
+		// Glass menu background bar (redrawn per direction on expand)
+		const menuBar = new Graphics();
+		menuBar.alpha = 0;
+		btn.addChildAt(menuBar, 0);
+
+		let currentDir: Dir = 'left';
+
+		for (let i = 0; i < STICKERS.length; i++) {
+			const sticker = STICKERS[i];
+			const opt = new Container();
+			opt.eventMode = 'static';
+			opt.cursor = 'pointer';
+			// Start at trigger position (x=0), will animate to final position
+			opt.x = 0;
+			opt.y = 0;
+			opt.alpha = 0;
+			opt.scale.set(0);
+
+			const optEmoji = new Text({
+				text: sticker.emoji,
+				style: new TextStyle({ fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif' }),
+			});
+			optEmoji.anchor.set(0.5, 0.5);
+			optEmoji.y = -1;
+			opt.addChild(optEmoji);
+
+			// Hover: scale bounce on individual emoji
+			opt.on('pointerover', () => {
+				gsap.to(opt.scale, { x: 1.3, y: 1.3, duration: 0.15, ease: 'back.out(2)' });
+			});
+			opt.on('pointerout', () => {
+				gsap.to(opt.scale, { x: 1, y: 1, duration: 0.12, ease: 'power2.out' });
+			});
+
+			// Click to select sticker
+			opt.on('pointerdown', (e: FederatedPointerEvent) => {
+				e.stopPropagation();
+				// Bounce feedback
+				gsap.to(opt.scale, {
+					x: 1.6, y: 1.6, duration: 0.1, ease: 'power2.out',
+					onComplete: () => {
+						gsap.to(opt.scale, { x: 1, y: 1, duration: 0.2, ease: 'elastic.out(1, 0.5)' });
+					},
+				});
+				this.onStickerSelected?.(objectId, sticker.type);
+				// Collapse after a short delay for the bounce to play
+				setTimeout(() => collapse(), 200);
+			});
+
+			btn.addChild(opt);
+			options.push(opt);
+		}
+
+		// ── Expand / collapse ───────────────────────────────────────────
+
+		function expand() {
+			if (expanded) return;
+			expanded = true;
+
+			// Pick a random direction each time
+			currentDir = DIRS[Math.floor(Math.random() * DIRS.length)];
+			const isH = currentDir === 'left' || currentDir === 'right';
+
+			// Redraw bar for this direction and set initial scale
+			drawBar(currentDir);
+			menuBar.alpha = 0;
+			if (isH) {
+				menuBar.scale.set(0, 1);
+			} else {
+				menuBar.scale.set(1, 0);
+			}
+
+			btn.hitArea = dirHitArea(currentDir);
+
+			if (expandTl) expandTl.kill();
+			expandTl = gsap.timeline();
+
+			// Trigger: gentle pulse
+			expandTl.to(triggerBg, { alpha: 0.7, duration: 0.15 }, 0);
+
+			// Menu bar slides out
+			expandTl.to(menuBar, { alpha: 1, duration: 0.2, ease: 'power2.out' }, 0);
+			if (isH) {
+				expandTl.to(menuBar.scale, { x: 1, duration: 0.25, ease: 'power2.out' }, 0);
+			} else {
+				expandTl.to(menuBar.scale, { y: 1, duration: 0.25, ease: 'power2.out' }, 0);
+			}
+
+			// Emoji options slide out with stagger
+			options.forEach((opt, i) => {
+				const pos = emojiTarget(i, currentDir);
+				expandTl!.to(opt, {
+					x: pos.x, y: pos.y, alpha: 1, duration: 0.25, ease: 'back.out(1.4)',
+				}, 0.03 * i);
+				expandTl!.to(opt.scale, {
+					x: 1, y: 1, duration: 0.2, ease: 'back.out(2)',
+				}, 0.03 * i + 0.02);
+			});
+		}
+
+		function collapse() {
+			if (!expanded) return;
+			expanded = false;
+			const isH = currentDir === 'left' || currentDir === 'right';
+
+			if (expandTl) expandTl.kill();
+			expandTl = gsap.timeline({
+				onComplete: () => { btn.hitArea = TRIGGER_HIT; },
+			});
+
+			// Trigger: restore
+			expandTl.to(triggerBg, { alpha: 1, duration: 0.15 }, 0);
+
+			// Emojis slide back (reverse stagger — outermost first)
+			options.forEach((opt, i) => {
+				const delay = 0.02 * (options.length - 1 - i);
+				expandTl!.to(opt, {
+					x: 0, y: 0, alpha: 0, duration: 0.18, ease: 'power2.in',
+				}, delay);
+				expandTl!.to(opt.scale, {
+					x: 0, y: 0, duration: 0.15, ease: 'power2.in',
+				}, delay);
+			});
+
+			// Menu bar collapses after emojis
+			expandTl.to(menuBar, { alpha: 0, duration: 0.15, ease: 'power2.in' }, 0.1);
+			if (isH) {
+				expandTl.to(menuBar.scale, { x: 0, duration: 0.2, ease: 'power2.in' }, 0.08);
+			} else {
+				expandTl.to(menuBar.scale, { y: 0, duration: 0.2, ease: 'power2.in' }, 0.08);
+			}
+		}
+
+		// ── Events ──────────────────────────────────────────────────────
+
+		btn.on('pointerover', () => expand());
+		btn.on('pointerout', () => collapse());
+
+		// Prevent parent object handlers from firing when interacting with menu
+		btn.on('pointerdown', (e: FederatedPointerEvent) => {
+			e.stopPropagation();
+		});
+
+		// Pop-in entrance for the trigger
+		btn.scale.set(0);
+		gsap.to(btn.scale, { x: 1, y: 1, duration: 0.35, ease: 'back.out(2.5)', delay: 0.4 });
+
+		return btn;
 	}
 
 	destroy() {

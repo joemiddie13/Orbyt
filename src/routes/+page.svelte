@@ -340,6 +340,19 @@
 			stickerPickerState = { objectId, x: screenX, y: screenY };
 		};
 
+		// Wire up inline sticker selection (visitor hover menu on canvas)
+		renderer.onStickerSelected = async (objectId, stickerType) => {
+			try {
+				await client.mutation(api.stickers.addSticker, {
+					objectId: objectId as any,
+					stickerType,
+					position: { x: Math.random() * 80 - 20, y: -15 + Math.random() * 10 },
+				});
+			} catch (err) {
+				console.error('Failed to place sticker:', err);
+			}
+		};
+
 		// Wire up photo tap → detail panel
 		renderer.onPhotoTapped = (objectId) => {
 			const obj = canvasObjects.data?.find((o: any) => o._id === objectId);
