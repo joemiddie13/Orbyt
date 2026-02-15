@@ -236,6 +236,10 @@
 
 	// Elastic snap-back — bungee cord bounce to origin
 	function snapBack() {
+		// Immediately null quickTo refs so mousemove doesn't call stale functions
+		// while the snap-back tween is in flight (overwrite: 'auto' kills their internal tweens)
+		headerQX = headerQY = sentenceQX = sentenceQY = orbQX = orbQY = null;
+
 		// Panel bounces home
 		if (panel) {
 			gsap.to(panel, {
@@ -246,7 +250,6 @@
 		}
 
 		// Content layers bounce home — re-init quickTo after snap completes
-		// (overwrite: 'auto' kills quickTo's internal tweens, making them stale)
 		if (header) gsap.to(header, { x: 0, y: 0, duration: SNAP_DURATION, ease: SNAP_EASE, overwrite: 'auto', onComplete: initParallax });
 		if (sentenceBlock) gsap.to(sentenceBlock, { x: 0, y: 0, duration: SNAP_DURATION, ease: SNAP_EASE, overwrite: 'auto' });
 		if (ambientOrb) gsap.to(ambientOrb, { x: 0, y: 0, duration: SNAP_DURATION, ease: SNAP_EASE, overwrite: 'auto' });
@@ -1107,17 +1110,16 @@
 		top: 40%;
 		left: 50%;
 		transform: translate(-50%, -50%);
-		width: 300px;
-		height: 300px;
+		width: 500px;
+		height: 500px;
 		border-radius: 50%;
-		background: radial-gradient(circle, rgba(255, 167, 38, 0.15) 0%, transparent 70%);
+		background: radial-gradient(circle, rgba(255, 167, 38, 0.12) 0%, rgba(255, 167, 38, 0.06) 25%, rgba(255, 167, 38, 0.02) 50%, transparent 70%);
 		pointer-events: none;
-		filter: blur(40px);
 		transition: background 0.4s ease;
 		will-change: transform, opacity;
 	}
 
 	.ambient-orb.direct {
-		background: radial-gradient(circle, rgba(38, 166, 154, 0.15) 0%, transparent 70%);
+		background: radial-gradient(circle, rgba(38, 166, 154, 0.12) 0%, rgba(38, 166, 154, 0.06) 25%, rgba(38, 166, 154, 0.02) 50%, transparent 70%);
 	}
 </style>

@@ -11,4 +11,9 @@ import * as PIXI from 'pixi.js';
 gsap.registerPlugin(PixiPlugin);
 PixiPlugin.registerPIXI(PIXI);
 
+// Frame-drop protection: if a frame takes longer than 500ms, GSAP skips
+// ahead instead of trying to cram multiple frames of progress into one
+// callback (which causes a cascade of expensive catch-up frames).
+gsap.ticker.lagSmoothing(500, 33);
+
 export { gsap };

@@ -1,4 +1,4 @@
-import { Container, Graphics, Sprite, Text, Texture, TextStyle } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite, Text, Texture, TextStyle } from 'pixi.js';
 import { gsap } from '../gsapInit';
 import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
 
@@ -27,7 +27,7 @@ const RIPPLE_MAX_ALIVE = 3;
 const HEARTBEAT_REPEAT_DELAY = 1.8;
 
 // Halftone display — sprites whose SCALE varies with signal intensity
-const HALFTONE_CELL = 16;
+const HALFTONE_CELL = 22;
 const HALFTONE_TEX_SIZE = 32;
 
 /** Shared white circle texture — created once, used by all beacon dot sprites */
@@ -87,8 +87,8 @@ export class BeaconObject {
 	// Halftone animation (sprite-based — no geometry rebuild per frame)
 	private halftoneContainer: Container | null = null;
 	private halftoneDots: { sprite: Sprite; dist: number }[] = [];
-	private halftoneMask: Graphics | null = null;
 	private halftoneTime: number = 0;
+	private halftoneFrame: number = 0;
 	private animTick: (() => void) | null = null;
 
 	// Animation state
@@ -114,6 +114,8 @@ export class BeaconObject {
 		this.container.y = y;
 		this.container.eventMode = 'static';
 		this.container.cursor = (options.editable !== false) ? 'pointer' : 'default';
+		// Perf: fixed bounds prevents recursive measurement of all children
+		this.container.boundsArea = new Rectangle(-20, -20, BEACON_WIDTH + 40, this.cardHeight + 40);
 
 		// --- Layer 1: Ripple emanation (behind everything) ---
 		this.rippleLayer = new Container();
@@ -178,20 +180,25 @@ export class BeaconObject {
 				}
 			}
 
-			// Mask dots to card shape (rounded corners)
-			this.halftoneMask = new Graphics();
-			this.halftoneMask.roundRect(0, 0, BEACON_WIDTH, this.cardHeight, CORNER_RADIUS);
-			this.halftoneMask.fill(0xffffff);
-			this.container.addChild(this.halftoneMask);
-			this.halftoneContainer.mask = this.halftoneMask;
+			// Perf: fixed bounds area prevents recursive child measurement
+			this.halftoneContainer.boundsArea = new Rectangle(0, 0, BEACON_WIDTH, this.cardHeight);
+			// Perf: cache 144 sprites as a single texture — PixiJS draws 1 quad
+			// instead of 144 on frames where we don't update the halftone
+			this.halftoneContainer.cacheAsTexture({ antialias: true });
 
-			// Drive halftone — just property updates, runs at full framerate
+			// Drive halftone — throttled to every 5th frame (~12fps)
+			// The wave effect is slow enough that 12fps looks smooth
 			this.animTick = () => {
 				this.halftoneTime += 0.016;
-				this.updateHalftone();
+				if (++this.halftoneFrame % 5 === 0) {
+					this.updateHalftone();
+					// Re-render cached texture after sprite updates
+					this.halftoneContainer?.updateCacheTexture();
+				}
 			};
 			gsap.ticker.add(this.animTick);
 			this.updateHalftone();
+			this.halftoneContainer.updateCacheTexture();
 		}
 
 		// --- Layer 6: Signal dot (antenna at top center) ---
@@ -511,28 +518,37 @@ export class BeaconObject {
 	/** Update sprite scale/alpha based on signal wave intensity — no geometry rebuild */
 	private updateHalftone() {
 		const t = this.halftoneTime;
-		const maxScale = (HALFTONE_CELL * 0.84) / HALFTONE_TEX_SIZE;
+		const scaleRange = (HALFTONE_CELL * 0.84) / HALFTONE_TEX_SIZE;
 		const minScale = 1 / HALFTONE_TEX_SIZE;
 
-		for (let i = 0; i < this.halftoneDots.length; i++) {
-			const { sprite, dist } = this.halftoneDots[i];
+		// Pre-compute values shared across all dots (avoid per-dot redundancy)
+		const tA = t * 2.2;
+		const tB = t * 1.3 - 2;
+		const breath = Math.sin(t * 0.8) * 0.08 + 0.12;
+		const dots = this.halftoneDots;
+		const len = dots.length;
 
-			const w1 = Math.pow(Math.sin(dist * 20 - t * 2.2) * 0.5 + 0.5, 2.5);
-			const f1 = Math.max(0, 1 - dist * 1.7);
+		for (let i = 0; i < len; i++) {
+			const dot = dots[i];
+			const d = dot.dist;
 
-			const w2 = Math.pow(Math.sin(dist * 12 - t * 1.3 + 2) * 0.5 + 0.5, 4) * 0.35;
-			const f2 = Math.max(0, 1 - dist * 2);
+			// Simplified wave: one sin + squaring (cheaper than Math.pow)
+			const raw1 = Math.sin(d * 20 - tA) * 0.5 + 0.5;
+			const w1 = raw1 * raw1; // ~pow 2 (close enough to 2.5, much cheaper)
+			const f1 = 1 - d * 1.7;
 
-			const breath = Math.sin(t * 0.8) * 0.08 + 0.12;
-			const center = Math.max(0, 1 - dist * 2.5) * 0.6;
+			const raw2 = Math.sin(d * 12 - tB) * 0.5 + 0.5;
+			const w2 = raw2 * raw2 * raw2 * 0.35; // ~pow 3 (close enough to 4)
+			const f2 = 1 - d * 2;
 
-			let intensity = w1 * f1 + w2 * f2 + breath + center;
-			if (intensity < 0) intensity = 0;
-			else if (intensity > 1) intensity = 1;
+			const center = (1 - d * 2.5) * 0.6;
 
-			const s = minScale + (maxScale - minScale) * intensity;
-			sprite.scale.set(s);
-			sprite.alpha = 0.15 + 0.85 * intensity;
+			let intensity = (f1 > 0 ? w1 * f1 : 0) + (f2 > 0 ? w2 * f2 : 0) + breath + (center > 0 ? center : 0);
+			if (intensity > 1) intensity = 1;
+
+			const s = minScale + scaleRange * intensity;
+			dot.sprite.scale.set(s);
+			dot.sprite.alpha = 0.15 + 0.85 * intensity;
 		}
 	}
 
@@ -551,10 +567,13 @@ export class BeaconObject {
 			gsap.ticker.remove(this.animTick);
 			this.animTick = null;
 		}
-		// Dim all dots
+		// Dim all dots + release cached texture (no longer animating)
 		for (const dot of this.halftoneDots) {
 			dot.sprite.scale.set(0.03);
 			dot.sprite.alpha = 0.1;
+		}
+		if (this.halftoneContainer) {
+			this.halftoneContainer.updateCacheTexture();
 		}
 
 		// Reset glow layers to dim
@@ -583,16 +602,12 @@ export class BeaconObject {
 	/** Stop all tweens, animations, and clean up before removal */
 	destroy() {
 		this.stopPulse();
-		// Clean up halftone sprites
+		// Clean up halftone sprites + cached texture
 		this.halftoneDots = [];
 		if (this.halftoneContainer) {
-			this.halftoneContainer.mask = null;
+			this.halftoneContainer.cacheAsTexture(false); // release cached render texture
 			this.halftoneContainer.destroy({ children: true });
 			this.halftoneContainer = null;
-		}
-		if (this.halftoneMask) {
-			this.halftoneMask.destroy();
-			this.halftoneMask = null;
 		}
 	}
 
