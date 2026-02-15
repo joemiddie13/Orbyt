@@ -141,4 +141,6 @@ Authentication currently uses username/password via Better Auth. The auth layer 
 
 ## License
 
-Open source — MIT License.
+Open source — [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
+
+You're free to view, use, modify, and distribute this code. If you run a modified version as a network service, you must make your source code available under the same license. This protects the project's privacy-first philosophy while keeping everything transparent and open.
