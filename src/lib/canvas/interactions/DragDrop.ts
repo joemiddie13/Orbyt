@@ -104,7 +104,7 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 		startScreenX = event.globalX;
 		startScreenY = event.globalY;
 
-		const worldParent = target.parent;
+		const worldParent = target.parent!;
 		const worldX = (event.globalX - worldParent.x) / worldParent.scale.x;
 		const worldY = (event.globalY - worldParent.y) / worldParent.scale.y;
 		offsetX = worldX - target.x;
@@ -146,7 +146,7 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 
 		if (longPressFired) return;
 
-		const worldParent = target.parent;
+		const worldParent = target.parent!;
 		const worldX = (event.globalX - worldParent.x) / worldParent.scale.x;
 		const worldY = (event.globalY - worldParent.y) / worldParent.scale.y;
 

@@ -23,6 +23,7 @@ function validatePosition(position: { x: number; y: number }) {
 const textblockContent = v.object({
 	text: v.string(),
 	color: v.number(),
+	title: v.optional(v.string()),
 });
 
 /** Content validator for beacon type */
@@ -110,9 +111,12 @@ export const create = mutation({
 
 		// Type-specific validation
 		if (args.type === "textblock") {
-			const content = args.content as { text: string; color: number };
+			const content = args.content as { text: string; color: number; title?: string };
 			if (!content.text || content.text.length < 1 || content.text.length > MAX_TEXT_LENGTH) {
 				throw new Error(`Text must be 1–${MAX_TEXT_LENGTH} characters`);
+			}
+			if (content.title && content.title.length > 100) {
+				throw new Error("Note title must be 100 characters or less");
 			}
 		} else if (args.type === "beacon") {
 			const content = args.content as {
@@ -189,6 +193,9 @@ export const updateContent = mutation({
 
 		if (!args.content.text || args.content.text.length < 1 || args.content.text.length > MAX_TEXT_LENGTH) {
 			throw new Error(`Text must be 1–${MAX_TEXT_LENGTH} characters`);
+		}
+		if (args.content.title && args.content.title.length > 100) {
+			throw new Error("Note title must be 100 characters or less");
 		}
 
 		await ctx.db.patch(args.id, { content: args.content });

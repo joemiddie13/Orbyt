@@ -16,14 +16,14 @@
 	}: {
 		note: {
 			_id: string;
-			content: { text: string; color: number };
+			content: { text: string; color: number; title?: string };
 		};
 		screenX: number;
 		screenY: number;
 		screenWidth: number;
 		screenHeight: number;
 		scale: number;
-		onSave: (id: string, text: string, color: number) => void;
+		onSave: (id: string, text: string, color: number, title: string) => void;
 		onClose: () => void;
 		onDelete: (id: string) => void;
 	} = $props();
@@ -40,6 +40,7 @@
 	let editor: Editor | null = $state(null);
 	let editColor = $state(note.content.color);
 	let editText = $state(note.content.text);
+	let editTitle = $state(note.content.title ?? '');
 
 	/** Convert PixiJS hex number to CSS hex string */
 	function colorToHex(color: number): string {
@@ -49,9 +50,9 @@
 
 	function handleClose() {
 		const currentText = editor?.getHTML() ?? editText;
-		const changed = currentText !== note.content.text || editColor !== note.content.color;
+		const changed = currentText !== note.content.text || editColor !== note.content.color || editTitle !== (note.content.title ?? '');
 		if (changed) {
-			onSave(note._id, currentText, editColor);
+			onSave(note._id, currentText, editColor, editTitle);
 		}
 		onClose();
 	}
@@ -200,6 +201,13 @@
 		style="left: {screenX}px; top: {screenY}px; width: {editorWidth}px; background-color: {colorToHex(editColor)};"
 		onclick={(e) => e.stopPropagation()}
 	>
+		<input
+			type="text"
+			bind:value={editTitle}
+			placeholder="Add a title..."
+			maxlength="100"
+			class="inline-title-input"
+		/>
 		<div bind:this={editorElement} class="inline-editor"></div>
 	</div>
 </div>
@@ -272,6 +280,25 @@
 		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(245, 158, 11, 0.5);
 		max-height: 60vh;
 		overflow-y: auto;
+	}
+
+	.inline-title-input {
+		display: block;
+		width: 100%;
+		padding: 12px 16px 0 16px;
+		border: none;
+		outline: none;
+		background: transparent;
+		font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
+		font-size: 1.125rem;
+		font-weight: 700;
+		color: #292524;
+		line-height: 1.4;
+	}
+
+	.inline-title-input::placeholder {
+		color: #a8a29e;
+		font-weight: 600;
 	}
 
 	.inline-editor :global(.ProseMirror) {

@@ -57,24 +57,26 @@
 			<div class="space-y-2">
 				{#if members.data}
 					{#each members.data as member}
-						<div class="flex items-center gap-3 py-2">
-							<div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-sm font-medium">
-								{member.displayName.charAt(0).toUpperCase()}
+						{#if member}
+							<div class="flex items-center gap-3 py-2">
+								<div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-sm font-medium">
+									{member.displayName.charAt(0).toUpperCase()}
+								</div>
+								<div class="flex-1">
+									<p class="text-sm font-medium text-stone-800">{member.displayName}</p>
+									<p class="text-xs text-stone-400">@{member.username} · {member.role}</p>
+								</div>
+								{#if isOwner && member.role !== 'owner'}
+									<button
+										onclick={() => removeMember(member.uuid)}
+										disabled={removing === member.uuid}
+										class="text-xs text-stone-400 hover:text-red-500 transition cursor-pointer disabled:opacity-50"
+									>
+										Remove
+									</button>
+								{/if}
 							</div>
-							<div class="flex-1">
-								<p class="text-sm font-medium text-stone-800">{member.displayName}</p>
-								<p class="text-xs text-stone-400">@{member.username} · {member.role}</p>
-							</div>
-							{#if isOwner && member.role !== 'owner'}
-								<button
-									onclick={() => removeMember(member.uuid)}
-									disabled={removing === member.uuid}
-									class="text-xs text-stone-400 hover:text-red-500 transition cursor-pointer disabled:opacity-50"
-								>
-									Remove
-								</button>
-							{/if}
-						</div>
+						{/if}
 					{/each}
 				{/if}
 			</div>

@@ -11,7 +11,7 @@
 	}: {
 		note: {
 			_id: string;
-			content: { text: string; color: number };
+			content: { text: string; color: number; title?: string };
 			creatorId: string;
 		};
 		isOwner: boolean;
@@ -23,10 +23,23 @@
 
 	let editText = $state(note.content.text);
 	let editColor = $state(note.content.color);
+	let editTitle = $state(note.content.title ?? '');
+
+	/** Color hex lookup for CSS backgrounds */
+	const COLOR_HEX: Record<number, string> = {
+		0xfff9c4: '#fff9c4',
+		0xc8e6c9: '#c8e6c9',
+		0xbbdefb: '#bbdefb',
+		0xf8bbd0: '#f8bbd0',
+		0xffe0b2: '#ffe0b2',
+	};
+	function colorToHex(color: number): string {
+		return COLOR_HEX[color] ?? '#fff9c4';
+	}
 	let saving = $state(false);
 	let deleting = $state(false);
 
-	const isModified = $derived(editText !== note.content.text || editColor !== note.content.color);
+	const isModified = $derived(editText !== note.content.text || editColor !== note.content.color || editTitle !== (note.content.title ?? ''));
 
 	/** Color swatches for the picker */
 	const COLOR_OPTIONS: Array<{ value: number; name: string; bg: string; dot: string; ring: string }> = [
@@ -51,7 +64,7 @@
 		try {
 			await client.mutation(api.objects.updateContent, {
 				id: note._id as any,
-				content: { text: editText, color: editColor },
+				content: { text: editText, color: editColor, title: editTitle || undefined },
 			});
 			onClose();
 		} catch (err) {
@@ -85,9 +98,19 @@
 		<!-- Header -->
 		<div class="p-6 pb-3 flex-shrink-0 {activeColor.bg}">
 			<div class="flex items-center justify-between mb-2">
-				<div class="flex items-center gap-2">
-					<span class="w-3 h-3 rounded-full {activeColor.dot}"></span>
-					<h2 class="text-lg font-bold text-white">{activeColor.name} Note</h2>
+				<div class="flex items-center gap-2 min-w-0 flex-1">
+					<span class="w-3 h-3 rounded-full flex-shrink-0 {activeColor.dot}"></span>
+					{#if isOwner}
+						<input
+							type="text"
+							bind:value={editTitle}
+							placeholder="Untitled Note"
+							maxlength="100"
+							class="text-lg font-bold text-white bg-transparent border-none outline-none placeholder-white/40 w-full min-w-0"
+						/>
+					{:else}
+						<h2 class="text-lg font-bold text-white truncate">{editTitle || 'Untitled Note'}</h2>
+					{/if}
 				</div>
 				<button
 					onclick={onClose}
@@ -115,7 +138,7 @@
 		</div>
 
 		<!-- Content -->
-		<div class="flex-1 overflow-y-auto px-6 py-4 text-white/80">
+		<div class="flex-1 overflow-y-auto px-6 py-4" style="background-color: {colorToHex(editColor)}; color: #292524;">
 			{#if isOwner}
 				<RichTextEditor
 					content={note.content.text}

@@ -59,28 +59,30 @@
 				<div class="mb-5">
 					<p class="text-xs font-medium text-white/40 uppercase tracking-wider mb-2">Pending Requests</p>
 					{#each pendingRequests.data as req}
-						<div class="flex items-center justify-between py-2">
-							<div>
-								<p class="text-sm font-medium text-white">{req.displayName}</p>
-								<p class="text-xs text-white/40">@{req.username}</p>
+						{#if req}
+							<div class="flex items-center justify-between py-2">
+								<div>
+									<p class="text-sm font-medium text-white">{req.displayName}</p>
+									<p class="text-xs text-white/40">@{req.username}</p>
+								</div>
+								<div class="flex gap-1.5">
+									<button
+										onclick={() => accept(req.friendshipId)}
+										disabled={respondingTo === req.friendshipId}
+										class="lego-btn lego-btn-sm lego-emerald"
+									>
+										Accept
+									</button>
+									<button
+										onclick={() => decline(req.friendshipId)}
+										disabled={respondingTo === req.friendshipId}
+										class="lego-btn lego-btn-sm lego-neutral"
+									>
+										Decline
+									</button>
+								</div>
 							</div>
-							<div class="flex gap-1.5">
-								<button
-									onclick={() => accept(req.friendshipId)}
-									disabled={respondingTo === req.friendshipId}
-									class="lego-btn lego-btn-sm lego-emerald"
-								>
-									Accept
-								</button>
-								<button
-									onclick={() => decline(req.friendshipId)}
-									disabled={respondingTo === req.friendshipId}
-									class="lego-btn lego-btn-sm lego-neutral"
-								>
-									Decline
-								</button>
-							</div>
-						</div>
+						{/if}
 					{/each}
 				</div>
 			{/if}

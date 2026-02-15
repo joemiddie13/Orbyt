@@ -173,10 +173,11 @@ export class CanvasRenderer {
 				if (existing.container.x !== obj.position.x) existing.container.x = obj.position.x;
 				if (existing.container.y !== obj.position.y) existing.container.y = obj.position.y;
 
-				// Update text content and color for notes
+				// Update text content, color, and title for notes
 				if (obj.type === 'textblock' && existing instanceof TextBlock) {
 					existing.updateText(obj.content?.text ?? '');
 					existing.updateColor(obj.content?.color ?? 0xfff9c4);
+					existing.updateTitle(obj.content?.title ?? '');
 					existing.updateSize(obj.size?.w ?? 240, obj.size?.h ?? 0);
 				}
 
@@ -195,6 +196,7 @@ export class CanvasRenderer {
 			} else if (obj.type === 'textblock') {
 				const color = obj.content?.color ?? 0xfff9c4;
 				const text = obj.content?.text ?? '';
+				const title = obj.content?.title ?? '';
 				// Suppress individual pop-in during bulk load — stagger handles it
 				const shouldAnimate = isBulkLoad ? false : animate;
 				const block = new TextBlock(text, obj.position.x, obj.position.y, color, {
@@ -209,7 +211,7 @@ export class CanvasRenderer {
 					onLongPress: (id, sx, sy) => this.onObjectLongPress?.(id, sx, sy),
 					onTap: (id) => this.onNoteTapped?.(id),
 					onResize: (id, x, y, w, h) => this.onObjectResized?.(id, x, y, w, h),
-				});
+				}, title);
 				this.world.addChild(block.container);
 				this.objects.set(obj._id, block);
 				if (isBulkLoad) newContainers.push(block.container);

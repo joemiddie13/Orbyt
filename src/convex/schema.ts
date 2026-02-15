@@ -65,6 +65,7 @@ export default defineSchema({
 			v.object({
 				text: v.string(),
 				color: v.number(),
+				title: v.optional(v.string()),
 			}),
 			v.object({
 				title: v.string(),

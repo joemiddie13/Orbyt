@@ -413,7 +413,7 @@
 			type: 'textblock',
 			position: { x: center.x - 120, y: center.y - 40 },
 			size: { w: 240, h: 80 },
-			content: { text: 'New note...', color },
+			content: { text: 'New note...', color, title: '' },
 		});
 	}
 
@@ -506,18 +506,19 @@
 	}
 
 	/** Save inline note edits: optimistic update + Convex mutation */
-	async function saveInlineNote(id: string, text: string, color: number) {
+	async function saveInlineNote(id: string, text: string, color: number, title: string) {
 		// Optimistic: update PixiJS immediately
 		const block = renderer.getObject(id);
 		if (block instanceof TextBlock) {
 			block.updateText(text);
 			block.updateColor(color);
+			block.updateTitle(title);
 		}
 
 		try {
 			await client.mutation(api.objects.updateContent, {
 				id: id as any,
-				content: { text, color },
+				content: { text, color, title: title || undefined },
 			});
 		} catch (err) {
 			console.error('Failed to save note:', err);

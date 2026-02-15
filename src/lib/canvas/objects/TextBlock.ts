@@ -1,4 +1,4 @@
-import { Container, Graphics, HTMLText, HTMLTextStyle, type FederatedPointerEvent } from 'pixi.js';
+import { Container, Graphics, HTMLText, HTMLTextStyle, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
 import { gsap } from '../gsapInit';
 import { makeDraggable, makeLongPressable } from '../interactions/DragDrop';
 
@@ -72,10 +72,12 @@ export class TextBlock {
 	objectId?: string;
 
 	private background: Graphics;
+	private titleDisplay: Text | null = null;
 	private textDisplay: HTMLText;
 	private blockWidth: number;
 	private blockHeight: number;
 	private currentColor: number = 0xfff9c4;
+	private currentTitle: string = '';
 	private options: TextBlockOptions;
 	private style: HTMLTextStyle;
 	/** Active color transition tween (killed before starting a new one) */
@@ -86,11 +88,14 @@ export class TextBlock {
 	/** Resize zone handles */
 	private resizeZones: ResizeZone[] = [];
 
+	/** Gap between title and body text */
+	private static readonly TITLE_GAP = 4;
+
 	/** Public getters for overlay positioning */
 	get width(): number { return this.blockWidth; }
 	get height(): number { return this.blockHeight; }
 
-	constructor(content: string, x: number, y: number, color: number = 0xfff9c4, options: TextBlockOptions = {}) {
+	constructor(content: string, x: number, y: number, color: number = 0xfff9c4, options: TextBlockOptions = {}, title: string = '') {
 		this.objectId = options.objectId;
 		this.options = options;
 		this.container = new Container();
@@ -133,6 +138,25 @@ export class TextBlock {
 		this.textDisplay.x = PADDING;
 		this.textDisplay.y = PADDING;
 
+		// Title display (plain PixiJS Text — synchronous measurement)
+		this.currentTitle = title;
+		if (title) {
+			this.titleDisplay = new Text({
+				text: title,
+				style: new TextStyle({
+					fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+					fontSize: 18,
+					fontWeight: 'bold',
+					fill: 0x2d2d2d,
+					wordWrap: true,
+					wordWrapWidth: this.blockWidth - PADDING * 2,
+				}),
+			});
+			this.titleDisplay.x = PADDING;
+			this.titleDisplay.y = PADDING;
+			this.textDisplay.y = PADDING + this.titleDisplay.height + TextBlock.TITLE_GAP;
+		}
+
 		// Calculate height: max of text needs, user preference, and minimum
 		this.blockHeight = 0; // placeholder — recalcBlockHeight sets real value
 		this.recalcBlockHeight();
@@ -143,6 +167,7 @@ export class TextBlock {
 
 		// Add children in order: background first (behind), then text (in front)
 		this.container.addChild(this.background);
+		if (this.titleDisplay) this.container.addChild(this.titleDisplay);
 		this.container.addChild(this.textDisplay);
 
 		// Add resize zones (owner-editable notes only)
@@ -244,6 +269,46 @@ export class TextBlock {
 		});
 	}
 
+	/** Update the note title */
+	updateTitle(title: string) {
+		if (this.currentTitle === title) return;
+		this.currentTitle = title;
+
+		if (title) {
+			if (!this.titleDisplay) {
+				this.titleDisplay = new Text({
+					text: title,
+					style: new TextStyle({
+						fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+						fontSize: 18,
+						fontWeight: 'bold',
+						fill: 0x2d2d2d,
+						wordWrap: true,
+						wordWrapWidth: this.blockWidth - PADDING * 2,
+					}),
+				});
+				this.titleDisplay.x = PADDING;
+				this.titleDisplay.y = PADDING;
+				// Insert title between background and text
+				const bgIndex = this.container.getChildIndex(this.background);
+				this.container.addChildAt(this.titleDisplay, bgIndex + 1);
+			} else {
+				this.titleDisplay.text = title;
+			}
+			this.textDisplay.y = PADDING + this.titleDisplay.height + TextBlock.TITLE_GAP;
+		} else if (this.titleDisplay) {
+			this.container.removeChild(this.titleDisplay);
+			this.titleDisplay.destroy();
+			this.titleDisplay = null;
+			this.textDisplay.y = PADDING;
+		}
+
+		this.recalcBlockHeight();
+		this.background.clear();
+		this.drawBackground(this.currentColor);
+		this.updateResizeZones();
+	}
+
 	/** Update size from Convex sync (external data change) */
 	updateSize(width: number, height: number) {
 		const clampedW = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width));
@@ -254,6 +319,10 @@ export class TextBlock {
 		if (widthChanged) {
 			this.style.wordWrapWidth = this.blockWidth - PADDING * 2;
 			this.textDisplay.text = this.textDisplay.text; // force re-measure only when width changed
+			if (this.titleDisplay) {
+				(this.titleDisplay.style as TextStyle).wordWrapWidth = this.blockWidth - PADDING * 2;
+				this.titleDisplay.text = this.titleDisplay.text; // force re-measure
+			}
 		}
 		this.recalcBlockHeight();
 		this.background.clear();
@@ -262,9 +331,10 @@ export class TextBlock {
 		if (widthChanged) this.scheduleHeightCheck();
 	}
 
-	/** Height = max of text content, user preference, and absolute minimum */
+	/** Height = max of text content + title, user preference, and absolute minimum */
 	private recalcBlockHeight() {
-		const textFitHeight = this.textDisplay.height + PADDING * 2;
+		const titleHeight = this.titleDisplay ? this.titleDisplay.height + TextBlock.TITLE_GAP : 0;
+		const textFitHeight = this.textDisplay.height + titleHeight + PADDING * 2;
 		this.blockHeight = Math.max(MIN_HEIGHT, textFitHeight, this.userHeight);
 	}
 
@@ -277,7 +347,10 @@ export class TextBlock {
 		let lastHeight = -1;
 		const check = () => {
 			if (!this.container.parent) return; // destroyed
-			const textFitHeight = this.textDisplay.height + PADDING * 2;
+			const titleHeight = this.titleDisplay ? this.titleDisplay.height + TextBlock.TITLE_GAP : 0;
+			// Reposition body text below title (title may have re-measured after word wrap)
+			this.textDisplay.y = PADDING + titleHeight;
+			const textFitHeight = this.textDisplay.height + titleHeight + PADDING * 2;
 			const needed = Math.max(MIN_HEIGHT, textFitHeight, this.userHeight);
 			if (needed > this.blockHeight + 1) {
 				this.blockHeight = needed;
@@ -462,6 +535,10 @@ export class TextBlock {
 		if (widthChanged) {
 			this.style.wordWrapWidth = this.blockWidth - PADDING * 2;
 			this.textDisplay.text = this.textDisplay.text; // force re-measure only when width changed
+			if (this.titleDisplay) {
+				(this.titleDisplay.style as TextStyle).wordWrapWidth = this.blockWidth - PADDING * 2;
+				this.titleDisplay.text = this.titleDisplay.text;
+			}
 		}
 		this.recalcBlockHeight();
 		this.background.clear();

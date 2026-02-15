@@ -517,6 +517,12 @@ export class BeaconObject {
 
 	/** Update sprite scale/alpha based on signal wave intensity — no geometry rebuild */
 	private updateHalftone() {
+		const dots = this.halftoneDots;
+		const len = dots.length;
+		if (len === 0) return;
+		// Guard: bail if sprites were destroyed (container teardown race)
+		if (dots[0].sprite.destroyed) return;
+
 		const t = this.halftoneTime;
 		const scaleRange = (HALFTONE_CELL * 0.84) / HALFTONE_TEX_SIZE;
 		const minScale = 1 / HALFTONE_TEX_SIZE;
@@ -525,8 +531,6 @@ export class BeaconObject {
 		const tA = t * 2.2;
 		const tB = t * 1.3 - 2;
 		const breath = Math.sin(t * 0.8) * 0.08 + 0.12;
-		const dots = this.halftoneDots;
-		const len = dots.length;
 
 		for (let i = 0; i < len; i++) {
 			const dot = dots[i];
@@ -601,6 +605,11 @@ export class BeaconObject {
 
 	/** Stop all tweens, animations, and clean up before removal */
 	destroy() {
+		// Remove ticker FIRST to prevent updateHalftone() from accessing destroyed sprites
+		if (this.animTick) {
+			gsap.ticker.remove(this.animTick);
+			this.animTick = null;
+		}
 		this.stopPulse();
 		// Clean up halftone sprites + cached texture
 		this.halftoneDots = [];
