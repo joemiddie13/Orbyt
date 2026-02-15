@@ -215,12 +215,12 @@ export class BeaconObject {
 		// --- Layer 7: Text content ---
 		const titleStyle = new TextStyle({
 			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
-			fontSize: 18,
+			fontSize: 22,
 			fontWeight: 'bold',
 			fill: 0xffffff,
 			wordWrap: true,
 			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2 - 28,
-			lineHeight: 24,
+			lineHeight: 28,
 		});
 		const titleText = new Text({ text: content.title, style: titleStyle });
 		titleText.x = BEACON_PADDING + 24;
@@ -239,7 +239,7 @@ export class BeaconObject {
 		const timeStr = this.formatTimeRange(content.startTime, content.endTime);
 		const timeStyle = new TextStyle({
 			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
-			fontSize: 14,
+			fontSize: 16,
 			fill: 0xffffff,
 			wordWrap: true,
 			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
@@ -254,7 +254,7 @@ export class BeaconObject {
 		if (isDirect && content.fromUsername) {
 			const fromStyle = new TextStyle({
 				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
-				fontSize: 13,
+				fontSize: 15,
 				fill: 0xffffff,
 			});
 			const fromText = new Text({ text: `From ${content.fromUsername}`, style: fromStyle });
@@ -268,7 +268,7 @@ export class BeaconObject {
 		if (content.locationAddress) {
 			const locStyle = new TextStyle({
 				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
-				fontSize: 13,
+				fontSize: 15,
 				fill: 0xffffff,
 				wordWrap: true,
 				wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
@@ -285,7 +285,7 @@ export class BeaconObject {
 			this.container.alpha = 0.3;
 			const expStyle = new TextStyle({
 				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
-				fontSize: 13,
+				fontSize: 15,
 				fontWeight: 'bold',
 				fill: 0xffffff,
 			});

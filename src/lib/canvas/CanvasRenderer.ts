@@ -7,6 +7,7 @@ import { TextBlock } from './objects/TextBlock';
 import { BeaconObject, type BeaconContent } from './objects/BeaconObject';
 import { StickerReaction, type StickerData } from './objects/StickerReaction';
 import { PhotoObject, type PhotoContent } from './objects/PhotoObject';
+import { MusicObject, type MusicContent } from './objects/MusicObject';
 
 /**
  * CanvasRenderer — the core of Astrophage.
@@ -52,7 +53,8 @@ interface CanvasObjectBase {
 export type CanvasObjectData =
 	| (CanvasObjectBase & { type: "textblock"; content: TextBlockContent })
 	| (CanvasObjectBase & { type: "beacon"; content: BeaconContent })
-	| (CanvasObjectBase & { type: "photo"; content: PhotoContent });
+	| (CanvasObjectBase & { type: "photo"; content: PhotoContent })
+	| (CanvasObjectBase & { type: "music"; content: MusicContent });
 
 export class CanvasRenderer {
 	app: Application;
@@ -63,7 +65,7 @@ export class CanvasRenderer {
 	private starField!: StarField;
 
 	/** Map from Convex _id → visual object for reconciliation */
-	private objects = new Map<string, TextBlock | BeaconObject | PhotoObject>();
+	private objects = new Map<string, TextBlock | BeaconObject | PhotoObject | MusicObject>();
 
 	/** Map from sticker _id → StickerReaction */
 	private stickers = new Map<string, StickerReaction>();
@@ -102,6 +104,12 @@ export class CanvasRenderer {
 
 	/** Callback for when a photo is tapped */
 	onPhotoTapped?: (objectId: string) => void;
+
+	/** Callback for when a music card is tapped */
+	onMusicTapped?: (objectId: string) => void;
+
+	/** Callback for when a music card's delete button is pressed */
+	onMusicDeleted?: (objectId: string) => void;
 
 	/** Callback for long-press on any object (sticker picker) */
 	onObjectLongPress?: (objectId: string, screenX: number, screenY: number) => void;
@@ -169,6 +177,7 @@ export class CanvasRenderer {
 				if (obj instanceof BeaconObject) obj.destroy();
 				if (obj instanceof TextBlock) obj.destroy();
 				if (obj instanceof PhotoObject) obj.destroy();
+				if (obj instanceof MusicObject) obj.destroy();
 				this.world.removeChild(obj.container);
 				obj.container.destroy({ children: true });
 				this.objects.delete(id);
@@ -262,6 +271,24 @@ export class CanvasRenderer {
 				this.objects.set(obj._id, photo);
 				if (!this.editable) photo.container.addChild(this.createStickerButton(obj._id, obj.size.w ?? 260));
 				if (isBulkLoad) newContainers.push(photo.container);
+			} else if (obj.type === 'music') {
+				const content = obj.content;
+				const shouldAnimate = isBulkLoad ? false : animate;
+				const music = new MusicObject(content, obj.position.x, obj.position.y, {
+					objectId: obj._id,
+					editable: this.editable,
+					animate: shouldAnimate,
+					onDragStart: (id) => this.onObjectDragStart?.(id),
+					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
+					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
+					onTap: (id) => this.onMusicTapped?.(id),
+					onLongPress: (id, sx, sy) => this.onObjectLongPress?.(id, sx, sy),
+					onDelete: (id) => this.onMusicDeleted?.(id),
+				});
+				this.world.addChild(music.container);
+				this.objects.set(obj._id, music);
+				if (!this.editable) music.container.addChild(this.createStickerButton(obj._id, obj.size.w ?? 260));
+				if (isBulkLoad) newContainers.push(music.container);
 			}
 		}
 
@@ -379,8 +406,40 @@ export class CanvasRenderer {
 	}
 
 	/** Get a canvas object by its Convex _id */
-	getObject(objectId: string): TextBlock | BeaconObject | PhotoObject | undefined {
+	getObject(objectId: string): TextBlock | BeaconObject | PhotoObject | MusicObject | undefined {
 		return this.objects.get(objectId);
+	}
+
+	/** Set the visual playing state of a music object */
+	setMusicPlaying(objectId: string, playing: boolean) {
+		const obj = this.objects.get(objectId);
+		if (obj instanceof MusicObject) {
+			obj.setPlaying(playing);
+		}
+	}
+
+	/** Get a music object's world position and card dimensions */
+	getMusicObjectRect(objectId: string): { worldX: number; worldY: number; w: number; h: number } | null {
+		const obj = this.objects.get(objectId);
+		if (!(obj instanceof MusicObject)) return null;
+		return { worldX: obj.container.x, worldY: obj.container.y, w: 320, h: 110 };
+	}
+
+	/** Hide/show a music object's PixiJS visuals (for iframe overlay) */
+	setMusicObjectVisible(objectId: string, visible: boolean) {
+		const obj = this.objects.get(objectId);
+		if (obj instanceof MusicObject) {
+			obj.container.visible = visible;
+		}
+	}
+
+	/** Move a music object to a new world position (for DOM drag sync) */
+	moveMusicObject(objectId: string, worldX: number, worldY: number) {
+		const obj = this.objects.get(objectId);
+		if (obj instanceof MusicObject) {
+			obj.container.x = worldX;
+			obj.container.y = worldY;
+		}
 	}
 
 	/** Show or update a remote user's cursor on the canvas */

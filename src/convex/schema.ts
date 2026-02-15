@@ -52,7 +52,7 @@ export default defineSchema({
 	canvasObjects: defineTable({
 		canvasId: v.id("canvases"),
 		creatorId: v.string(), // UUID, not Convex _id
-		type: v.union(v.literal("textblock"), v.literal("beacon"), v.literal("photo")),
+		type: v.union(v.literal("textblock"), v.literal("beacon"), v.literal("photo"), v.literal("music")),
 		position: v.object({
 			x: v.number(),
 			y: v.number(),
@@ -81,6 +81,14 @@ export default defineSchema({
 				storageId: v.string(),
 				caption: v.optional(v.string()),
 				rotation: v.number(),
+			}),
+			v.object({
+				url: v.string(),
+				platform: v.string(),
+				title: v.string(),
+				artist: v.string(),
+				thumbnailUrl: v.optional(v.string()),
+				embedUrl: v.string(),
 			}),
 		),
 		expiresAt: v.optional(v.number()),

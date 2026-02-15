@@ -17,6 +17,7 @@
 	import InlineNoteEditor from '$lib/components/InlineNoteEditor.svelte';
 	import StickerPicker from '$lib/components/StickerPicker.svelte';
 	import PhotoDetailPanel from '$lib/components/PhotoDetailPanel.svelte';
+	import AddMusicModal from '$lib/components/AddMusicModal.svelte';
 	import ViewerAvatars from '$lib/components/ViewerAvatars.svelte';
 	import { TextBlock } from '$lib/canvas/objects/TextBlock';
 
@@ -56,6 +57,10 @@
 	let selectedNote = $state<any>(null);
 	let stickerPickerState = $state<{ objectId: string; x: number; y: number } | null>(null);
 	let selectedPhoto = $state<any>(null);
+	let showAddMusic = $state(false);
+	let playingMusicId = $state<string | null>(null);
+	let audioIframe: HTMLIFrameElement | null = null;
+	let morphWrapper: HTMLDivElement | null = null;
 
 	// Inline note editor state (owner-only, replaces NoteDetailPanel for owners)
 	let inlineEditState = $state<{
@@ -361,6 +366,31 @@
 			}
 		};
 
+		// Wire up music tap → toggle play on card
+		renderer.onMusicTapped = (objectId) => {
+			if (playingMusicId === objectId) {
+				// Same card — stop playback
+				stopMusicPlayback();
+				return;
+			}
+			const obj = canvasObjects.data?.find((o: any) => o._id === objectId);
+			if (!obj || obj.type !== 'music') return;
+			const content = obj.content as { embedUrl: string; platform: string };
+			// Different card (or nothing playing) — start this one
+			stopMusicPlayback();
+			startMusicPlayback(objectId, content.embedUrl, content.platform);
+		};
+
+		// Wire up music delete
+		renderer.onMusicDeleted = async (objectId) => {
+			if (playingMusicId === objectId) stopMusicPlayback();
+			try {
+				await client.mutation(api.objects.remove, { id: objectId as any });
+			} catch (err) {
+				console.error('Failed to delete music:', err);
+			}
+		};
+
 		// Stream cursor position over WebRTC
 		renderer.app.stage.eventMode = 'static';
 		renderer.app.stage.hitArea = renderer.app.screen;
@@ -369,9 +399,31 @@
 			const world = renderer.screenToWorld(event.globalX, event.globalY);
 			peerManager.sendCursor(world.x, world.y);
 		});
+
+		// Global Escape key → close topmost modal/menu
+		window.addEventListener('keydown', handleEscape);
 	});
 
+	function handleEscape(e: KeyboardEvent) {
+		if (e.key !== 'Escape') return;
+		// Close the topmost open modal (order: overlays first, then panels, then pickers)
+		if (inlineEditState) { closeInlineEditor(); return; }
+		if (showAddMusic) { showAddMusic = false; return; }
+		if (showCreateBeacon) { showCreateBeacon = false; return; }
+		if (showCreateCanvas) { showCreateCanvas = false; return; }
+		if (selectedPhoto) { selectedPhoto = null; return; }
+		if (selectedBeacon) { selectedBeacon = null; return; }
+		if (selectedNote) { selectedNote = null; return; }
+		if (stickerPickerState) { stickerPickerState = null; return; }
+		if (showFriendCode) { showFriendCode = false; return; }
+		if (showFriendsList) { showFriendsList = false; return; }
+		if (showCanvasSwitcher) { showCanvasSwitcher = false; return; }
+		if (playingMusicId) { stopMusicPlayback(); return; }
+	}
+
 	onDestroy(() => {
+		if (typeof window !== 'undefined') window.removeEventListener('keydown', handleEscape);
+		stopMusicPlayback();
 		peerManager?.destroy();
 		peerManager = null;
 		if (heartbeatInterval) {
@@ -400,6 +452,11 @@
 	$effect(() => {
 		if (renderer && canvasObjects.data) {
 			renderer.syncObjects(canvasObjects.data as CanvasObjectData[]);
+
+			// Stop playback if the playing music card was deleted
+			if (playingMusicId && !canvasObjects.data.some((o: any) => o._id === playingMusicId)) {
+				stopMusicPlayback();
+			}
 		}
 	});
 
@@ -474,6 +531,7 @@
 
 	/** Switch to a different canvas */
 	function switchCanvas(canvasId: string, name: string) {
+		stopMusicPlayback();
 		activeCanvasId = canvasId;
 		activeCanvasName = name;
 		showCanvasSwitcher = false;
@@ -545,6 +603,190 @@
 		}
 	}
 
+	// Official embed dimensions per platform (fixed screen size, not scaled with zoom)
+	const EMBED_SIZES: Record<string, { w: number; h: number }> = {
+		spotify: { w: 352, h: 152 },
+		youtube: { w: 380, h: 215 },
+		'youtube-music': { w: 1, h: 1 },    // hidden, audio only
+		'apple-music': { w: 400, h: 175 },
+	};
+
+	// Platforms whose embeds morph onto the card (positioned at card location on canvas)
+	const MORPH_PLATFORMS = new Set(['spotify', 'apple-music']);
+
+	/** Ticker callback for repositioning morph wrapper on pan/zoom */
+	let morphTickerFn: (() => void) | null = null;
+	/** Paused during DOM drag so ticker doesn't fight with pointer movement */
+	let morphDragging = false;
+
+	/** Create a draggable morph wrapper around an iframe, positioned at the card */
+	function createMorphWrapper(iframe: HTMLIFrameElement, objectId: string, embed: { w: number; h: number }): HTMLDivElement {
+		const HANDLE_H = 28;
+
+		const wrapper = document.createElement('div');
+		wrapper.style.cssText = `position:fixed;width:${embed.w}px;height:${embed.h + HANDLE_H}px;z-index:40;border-radius:12px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);`;
+
+		// Drag handle bar at top
+		const handle = document.createElement('div');
+		handle.style.cssText = `width:100%;height:${HANDLE_H}px;background:#1a1a2e;cursor:grab;display:flex;align-items:center;justify-content:center;user-select:none;`;
+
+		// Grip dots
+		const grip = document.createElement('div');
+		grip.style.cssText = 'width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.25);';
+		handle.appendChild(grip);
+
+		// Iframe fills the rest
+		iframe.style.cssText = `width:100%;height:${embed.h}px;border:none;display:block;`;
+
+		wrapper.appendChild(handle);
+		wrapper.appendChild(iframe);
+
+		// ── Drag logic ──
+		let dragging = false;
+		let startX = 0;
+		let startY = 0;
+		let wrapperStartX = 0;
+		let wrapperStartY = 0;
+
+		const onPointerDown = (e: PointerEvent) => {
+			dragging = true;
+			morphDragging = true;
+			startX = e.clientX;
+			startY = e.clientY;
+			wrapperStartX = wrapper.offsetLeft;
+			wrapperStartY = wrapper.offsetTop;
+			handle.style.cursor = 'grabbing';
+			handle.setPointerCapture(e.pointerId);
+			e.preventDefault();
+		};
+
+		const onPointerMove = (e: PointerEvent) => {
+			if (!dragging || !renderer) return;
+			const dx = e.clientX - startX;
+			const dy = e.clientY - startY;
+			const newLeft = wrapperStartX + dx;
+			const newTop = wrapperStartY + dy;
+			wrapper.style.left = `${newLeft}px`;
+			wrapper.style.top = `${newTop}px`;
+
+			// Sync the PixiJS object to follow the DOM drag
+			// Convert wrapper center to world coords
+			const centerScreenX = newLeft + embed.w / 2;
+			const centerScreenY = newTop + HANDLE_H + embed.h / 2;
+			const world = renderer.screenToWorld(centerScreenX, centerScreenY);
+			// Offset so the card center aligns
+			renderer.moveMusicObject(objectId, world.x - 160, world.y - 55);
+		};
+
+		const onPointerUp = (e: PointerEvent) => {
+			if (!dragging || !renderer) return;
+			dragging = false;
+			morphDragging = false;
+			handle.style.cursor = 'grab';
+			handle.releasePointerCapture(e.pointerId);
+
+			// Persist new position to Convex
+			const rect = renderer.getMusicObjectRect(objectId);
+			if (rect && renderer.onObjectMoved) {
+				renderer.onObjectMoved(objectId, rect.worldX, rect.worldY);
+			}
+		};
+
+		handle.addEventListener('pointerdown', onPointerDown);
+		handle.addEventListener('pointermove', onPointerMove);
+		handle.addEventListener('pointerup', onPointerUp);
+
+		return wrapper;
+	}
+
+	/** Start playing music */
+	function startMusicPlayback(objectId: string, embedUrl: string, platform: string) {
+		const sep = embedUrl.includes('?') ? '&' : '?';
+		let url = embedUrl + sep + 'autoplay=1';
+		if (platform === 'spotify') url += '&theme=0';
+
+		const embed = EMBED_SIZES[platform] ?? { w: 380, h: 152 };
+		const isMorph = MORPH_PLATFORMS.has(platform);
+		const isHidden = platform === 'youtube-music';
+
+		const iframe = document.createElement('iframe');
+		iframe.src = url;
+		iframe.allow = 'autoplay; encrypted-media';
+		iframe.setAttribute('frameborder', '0');
+
+		if (isMorph && renderer) {
+			// Morph: wrap iframe in draggable container, center on card
+			const rect = renderer.getMusicObjectRect(objectId);
+			if (rect) {
+				const wrapper = createMorphWrapper(iframe, objectId, embed);
+
+				const scale = renderer.getScale();
+				const cardScreen = renderer.worldToScreen(rect.worldX, rect.worldY);
+				const cx = cardScreen.x + (rect.w * scale) / 2;
+				const cy = cardScreen.y + (rect.h * scale) / 2;
+				wrapper.style.left = `${cx - embed.w / 2}px`;
+				wrapper.style.top = `${cy - (embed.h + 28) / 2}px`;
+
+				document.body.appendChild(wrapper);
+				morphWrapper = wrapper;
+
+				// Hide the PixiJS card underneath
+				renderer.setMusicObjectVisible(objectId, false);
+
+				// Track pan/zoom: reposition wrapper centered on card every frame
+				morphTickerFn = () => {
+					if (!morphWrapper || !renderer || morphDragging) return;
+					const r = renderer.getMusicObjectRect(objectId);
+					if (!r) return;
+					const sc = renderer.getScale();
+					const s = renderer.worldToScreen(r.worldX, r.worldY);
+					const mcx = s.x + (r.w * sc) / 2;
+					const mcy = s.y + (r.h * sc) / 2;
+					morphWrapper.style.left = `${mcx - embed.w / 2}px`;
+					morphWrapper.style.top = `${mcy - (embed.h + 28) / 2}px`;
+				};
+				renderer.app.ticker.add(morphTickerFn);
+			}
+		} else if (isHidden) {
+			// YouTube Music: hidden, autoplay works
+			iframe.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;border:none;opacity:0.01;pointer-events:none;';
+			document.body.appendChild(iframe);
+		} else {
+			// YouTube video: visible floating embed at bottom-center
+			iframe.style.cssText = `position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:${embed.w}px;max-width:calc(100vw - 32px);height:${embed.h}px;border:none;border-radius:12px;z-index:40;box-shadow:0 8px 32px rgba(0,0,0,0.4);`;
+			document.body.appendChild(iframe);
+		}
+
+		audioIframe = iframe;
+		playingMusicId = objectId;
+		renderer?.setMusicPlaying(objectId, true);
+	}
+
+	/** Stop any playing music */
+	function stopMusicPlayback() {
+		// Remove the ticker that tracks pan/zoom
+		if (morphTickerFn && renderer) {
+			renderer.app.ticker.remove(morphTickerFn);
+			morphTickerFn = null;
+		}
+
+		// Remove morph wrapper (contains the iframe) or standalone iframe
+		if (morphWrapper) {
+			document.body.removeChild(morphWrapper);
+			morphWrapper = null;
+			audioIframe = null;
+		} else if (audioIframe) {
+			document.body.removeChild(audioIframe);
+			audioIframe = null;
+		}
+
+		if (playingMusicId) {
+			renderer?.setMusicPlaying(playingMusicId, false);
+			renderer?.setMusicObjectVisible(playingMusicId, true);
+			playingMusicId = null;
+		}
+	}
+
 </script>
 
 <div bind:this={canvasContainer} class="w-screen h-screen overflow-hidden"></div>
@@ -561,6 +803,7 @@
 		onAddNote={addNote}
 		onCreateBeacon={() => { showCreateBeacon = true; }}
 		onAddPhoto={addPhoto}
+		onAddMusic={() => { showAddMusic = true; }}
 		onFriends={() => { showFriendCode = true; }}
 		onFriendsList={() => { showFriendsList = true; }}
 		onCanvasSwitcher={() => { showCanvasSwitcher = !showCanvasSwitcher; }}
@@ -667,3 +910,12 @@
 		onDeleted={() => { selectedPhoto = null; }}
 	/>
 {/if}
+
+{#if showAddMusic && activeCanvasId}
+	<AddMusicModal
+		canvasId={activeCanvasId}
+		onClose={() => { showAddMusic = false; }}
+		onCreated={() => { showAddMusic = false; }}
+	/>
+{/if}
+

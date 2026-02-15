@@ -16,6 +16,28 @@ export const MAX_DESCRIPTION_LENGTH = 1000;
 export const MAX_LOCATION_LENGTH = 500;
 export const MAX_CAPTION_LENGTH = 200;
 
+// --- Music limits ---
+export const MAX_MUSIC_URL_LENGTH = 500;
+export const MAX_MUSIC_TITLE_LENGTH = 300;
+export const MAX_MUSIC_ARTIST_LENGTH = 200;
+
+const SPOTIFY_RE = /^https?:\/\/open\.spotify\.com\/(track|album|playlist|episode|show)\//;
+const YOUTUBE_MUSIC_RE = /^https?:\/\/music\.youtube\.com\/watch/;
+const YOUTUBE_RE = /^https?:\/\/(www\.)?(youtube\.com\/watch|youtu\.be\/|youtube\.com\/shorts\/)/;
+const APPLE_MUSIC_RE = /^https?:\/\/music\.apple\.com\//;
+
+/** Detect music platform from URL. Throws if unrecognized. */
+export function validateMusicUrl(url: string): "spotify" | "apple-music" | "youtube" | "youtube-music" {
+	if (url.length > MAX_MUSIC_URL_LENGTH) {
+		throw new Error(`URL must be ${MAX_MUSIC_URL_LENGTH} characters or less`);
+	}
+	if (SPOTIFY_RE.test(url)) return "spotify";
+	if (YOUTUBE_MUSIC_RE.test(url)) return "youtube-music";
+	if (YOUTUBE_RE.test(url)) return "youtube";
+	if (APPLE_MUSIC_RE.test(url)) return "apple-music";
+	throw new Error("Unsupported music URL. Paste a Spotify, YouTube, YouTube Music, or Apple Music link.");
+}
+
 // --- Beacon timing ---
 export const MAX_BEACON_DURATION_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 export const START_TIME_GRACE_MS = 60_000; // 1 minute grace for "not in the past"

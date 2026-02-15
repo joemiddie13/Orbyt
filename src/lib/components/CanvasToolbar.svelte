@@ -10,6 +10,7 @@
 		onAddNote,
 		onCreateBeacon,
 		onAddPhoto,
+		onAddMusic,
 		onFriends,
 		onFriendsList,
 		onCanvasSwitcher,
@@ -21,6 +22,7 @@
 		onAddNote: () => void;
 		onCreateBeacon: () => void;
 		onAddPhoto: () => void;
+		onAddMusic: () => void;
 		onFriends: () => void;
 		onFriendsList: () => void;
 		onCanvasSwitcher: () => void;
@@ -36,6 +38,9 @@
 	let beaconWave2: SVGElement = $state(undefined!);
 	let photoFlash: SVGElement = $state(undefined!);
 	let photoLens: SVGElement = $state(undefined!);
+	let musicNote: SVGElement = $state(undefined!);
+	let musicWave1: SVGElement = $state(undefined!);
+	let musicWave2: SVGElement = $state(undefined!);
 
 	// Store tweens for cleanup
 	let idleTweens: gsap.core.Tween[] = [];
@@ -79,6 +84,19 @@
 				})
 			);
 		}
+
+		// Music wave idle — opacity pulse
+		if (musicWave2) {
+			idleTweens.push(
+				gsap.to(musicWave2, {
+					opacity: 0.8,
+					duration: 2,
+					ease: 'sine.inOut',
+					yoyo: true,
+					repeat: -1,
+				})
+			);
+		}
 	});
 
 	onDestroy(() => {
@@ -109,6 +127,16 @@
 		tl.to(photoFlash, { scale: 1, opacity: 0.7, duration: 0.17, ease: 'power2.out' });
 		tl.fromTo(photoLens, { scale: 1, transformOrigin: '50% 50%' }, { scale: 1.15, duration: 0.15, ease: 'power2.out' }, 0);
 		tl.to(photoLens, { scale: 1, duration: 0.2, ease: 'back.out(1.4)' }, 0.15);
+	}
+
+	function musicEnter() {
+		if (!musicNote || !musicWave1 || !musicWave2) return;
+		const tl = gsap.timeline();
+		tl.to(musicNote, { rotation: -15, transformOrigin: '50% 100%', duration: 0.12, ease: 'power2.out' });
+		tl.to(musicNote, { rotation: 15, duration: 0.12, ease: 'power2.out' });
+		tl.to(musicNote, { rotation: 0, duration: 0.12, ease: 'power2.out' });
+		tl.fromTo(musicWave1, { scale: 0.8, opacity: 0.3, transformOrigin: '50% 50%' }, { scale: 1.2, opacity: 0.9, duration: 0.25, ease: 'power2.out' }, 0);
+		tl.fromTo(musicWave2, { scale: 0.8, opacity: 0.2, transformOrigin: '50% 50%' }, { scale: 1.2, opacity: 0.7, duration: 0.25, ease: 'power2.out' }, 0.08);
 	}
 
 	async function handleSignOut() {
@@ -213,6 +241,32 @@
 				/>
 			</svg>
 			Photo
+		</button>
+
+		<!-- Music button — note + sound waves -->
+		<button
+			onclick={onAddMusic}
+			onmouseenter={musicEnter}
+			class="lego-btn lego-teal flex items-center gap-1.5"
+		>
+			<svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+				<!-- Music note -->
+				<g bind:this={musicNote}>
+					<circle cx="7" cy="15" r="2.5" fill="white" opacity="0.95"/>
+					<rect x="9" y="4" width="2" height="11" rx="0.5" fill="white" opacity="0.95"/>
+					<path d="M9.5 4 L16 2 L16 6 L11 8" fill="white" opacity="0.8"/>
+				</g>
+				<!-- Sound wave arcs -->
+				<path bind:this={musicWave1}
+					d="M14 9 A3 3 0 0 1 14 15"
+					stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5"
+				/>
+				<path bind:this={musicWave2}
+					d="M16 7 A6 6 0 0 1 16 17"
+					stroke="white" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.3"
+				/>
+			</svg>
+			Music
 		</button>
 	{/if}
 

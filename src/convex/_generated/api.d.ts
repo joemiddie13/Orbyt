@@ -15,6 +15,7 @@ import type * as canvases from "../canvases.js";
 import type * as crons from "../crons.js";
 import type * as friendships from "../friendships.js";
 import type * as http from "../http.js";
+import type * as music from "../music.js";
 import type * as objects from "../objects.js";
 import type * as photos from "../photos.js";
 import type * as presence from "../presence.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   friendships: typeof friendships;
   http: typeof http;
+  music: typeof music;
   objects: typeof objects;
   photos: typeof photos;
   presence: typeof presence;
