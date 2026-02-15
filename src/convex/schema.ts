@@ -87,6 +87,7 @@ export default defineSchema({
 		directBeaconGroupId: v.optional(v.string()),
 	})
 		.index("by_canvas", ["canvasId"])
+		.index("by_creator", ["creatorId"])
 		.index("by_type_expires", ["type", "expiresAt"])
 		.index("by_beacon_group", ["directBeaconGroupId"]),
 

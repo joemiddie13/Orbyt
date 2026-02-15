@@ -232,6 +232,20 @@ export const remove = mutation({
 			throw new Error("Can only remove your own objects");
 		}
 
+		// Cascade delete associated data (responses + stickers)
+		const [responses, stickers] = await Promise.all([
+			ctx.db.query("beaconResponses")
+				.withIndex("by_beacon", (q) => q.eq("beaconId", args.id))
+				.collect(),
+			ctx.db.query("stickerReactions")
+				.withIndex("by_object", (q) => q.eq("objectId", args.id))
+				.collect(),
+		]);
+		await Promise.all([
+			...responses.map((r) => ctx.db.delete(r._id)),
+			...stickers.map((s) => ctx.db.delete(s._id)),
+		]);
+
 		await ctx.db.delete(args.id);
 	},
 });

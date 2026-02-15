@@ -103,6 +103,24 @@ export const createDirectBeacon = mutation({
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx);
 
+		// Rate limit: max 10 direct beacons per user per hour
+		const oneHourAgo = Date.now() - 60 * 60 * 1000;
+		const recentBeacons = await ctx.db
+			.query("canvasObjects")
+			.withIndex("by_creator", (q) => q.eq("creatorId", user.uuid))
+			.filter((q) =>
+				q.and(
+					q.eq(q.field("type"), "beacon"),
+					q.gt(q.field("_creationTime"), oneHourAgo)
+				)
+			)
+			.collect();
+		// Each direct beacon creates N+1 copies (recipients + self), so count unique groupIds
+		const uniqueGroups = new Set(recentBeacons.map((b) => b.directBeaconGroupId).filter(Boolean));
+		if (uniqueGroups.size >= 10) {
+			throw new Error("Rate limit: max 10 direct beacons per hour");
+		}
+
 		if (args.title.length < 1 || args.title.length > 200) {
 			throw new Error("Title must be 1–200 characters");
 		}
