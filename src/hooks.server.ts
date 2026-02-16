@@ -6,10 +6,12 @@ const isDev = process.env.NODE_ENV !== "production";
 
 const csp = [
 	"default-src 'self'",
-	isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self'",
-	"style-src 'self' 'unsafe-inline' https://api.fontshare.com",
+	isDev
+		? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+		: "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+	"style-src 'self' 'unsafe-inline' https://api.fontshare.com https://cdn.jsdelivr.net",
 	"img-src 'self' data: blob: https://*.convex.cloud https://i.scdn.co https://i.ytimg.com https://*.mzstatic.com https://mosaic.scdn.co",
-	"font-src 'self' https://cdn.fontshare.com",
+	"font-src 'self' https://cdn.fontshare.com https://cdn.jsdelivr.net",
 	`connect-src 'self' wss://*.convex.cloud https://*.convex.cloud${isDev ? " ws://localhost:* http://localhost:*" : ""}`,
 	"frame-src https://open.spotify.com https://www.youtube.com https://embed.music.apple.com",
 	"worker-src 'self' blob:",
