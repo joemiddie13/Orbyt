@@ -190,17 +190,23 @@ Every Convex mutation validates:
 
 ## Business Model
 
-Orbyt will never run ads, sell data, or exploit attention. The platform is funded entirely by voluntary donations — inspired by [Wikipedia](https://wikimediafoundation.org/) and [Signal](https://signal.org/).
+Orbyt will never run ads, sell data, or exploit attention.
 
-**Where donations go:**
+The platform is funded entirely by voluntary contributions — inspired by [Wikipedia](https://wikimediafoundation.org/) and [Signal](https://signal.org/). Individual users donate what they can. As the platform grows, we plan to offer corporate sponsorship tiers for organizations that benefit from healthier social technology — similar to how Wikimedia Enterprise serves companies that rely on Wikipedia's infrastructure.
+
+We're building on [Open Collective](https://opencollective.com/opensource) for full financial transparency. Every dollar in and every dollar out is publicly visible. No black boxes.
+
+**How funds are used:**
 
 1. **Keep Orbyt running** — hosting, infrastructure, development. We publish exactly what this costs.
-2. **Give back** — surplus funds go to charities, with a focus on:
-   - Protecting people affected by AI — creative workers, displaced communities, algorithmic bias
-   - AI for good — medical research, environmental science, public policy
-   - Digital rights — privacy, encryption, open internet advocacy
+2. **Give back** — once Orbyt is financially sustainable, surplus proceeds are redirected to causes that matter:
+   - **Scientific and medical research** — funding studies that use AI to accelerate breakthroughs in healthcare, disease prevention, and public health
+   - **Public policy** — supporting research on responsible AI governance, digital rights, and technology policy that protects people
+   - **Education** — making technology literacy, computer science, and AI education accessible to underserved communities
+   - **Communities affected by AI** — creative workers facing displacement, communities impacted by algorithmic bias, and those navigating a rapidly changing economy
+   - **Open internet advocacy** — privacy, encryption, and the organizations fighting to keep the internet free and open
 
-We're evaluating [Open Collective](https://opencollective.com/) for transparent financial reporting, so every dollar in and out is publicly visible.
+The goal is simple: build something people love, fund it honestly, and use whatever's left to make the world a little better.
 
 ## Contributing
 
