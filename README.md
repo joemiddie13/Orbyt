@@ -70,6 +70,8 @@ This is a passion project, not a startup. It grows organically. It's funded by d
 - **Living beacons** — Halftone dot display, ripple emanation, cascading heartbeat, signal dot antenna
 - **Performance** — cacheAsTexture, boundsArea, GSAP lag smoothing
 - **Security** — Multiple audit passes, RBAC on all mutations, input validation, rate limits, CSP hardening, cascade deletes
+- **Passkeys** — WebAuthn passwordless auth (Face ID, Touch ID, Windows Hello) via Better Auth passkey plugin
+- **Recovery codes** — 10 one-time SHA-256-hashed codes for password reset, account menu with security options
 
 ### In Progress
 
@@ -79,7 +81,6 @@ This is a passion project, not a startup. It grows organically. It's funded by d
 
 ### Next
 
-- **Passkeys** — Passwordless authentication (Face ID, Touch ID, Windows Hello)
 - **Rive animations** — Polish and delight across the canvas
 - **Donation system** — Open Collective and/or Stripe for transparent funding
 - **Mobile app** — "Friendship Health" dashboard inspired by Apple Fitness Rings. Each close friend gets a ring/meter representing hangout recency + frequency. Gamified but not addictive.
@@ -97,7 +98,7 @@ See [Privacy & Decentralization Roadmap](docs/PRIVACY_ROADMAP.md) for details.
 - **SvelteKit** (Svelte 5) + TypeScript strict mode
 - **PixiJS v8** — WebGL canvas rendering
 - **Convex** — Real-time backend with WebSocket sync
-- **Better Auth** — Username/password authentication
+- **Better Auth** — Username/password + passkey (WebAuthn) authentication
 - **GSAP** + PixiPlugin — Canvas and UI animations
 - **Tailwind CSS v4** — Styling for UI overlays
 - **Motion** — DOM/UI animations
