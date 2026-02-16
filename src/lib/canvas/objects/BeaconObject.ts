@@ -98,6 +98,7 @@ export class BeaconObject {
 	private rippleInterval: ReturnType<typeof setInterval> | null = null;
 	private activeRipples: { graphics: Graphics; tweens: gsap.core.Tween[] }[] = [];
 	private isExpired: boolean;
+	private isDestroyed = false;
 	private baseColor: number;
 	private cardHeight: number;
 
@@ -520,6 +521,7 @@ export class BeaconObject {
 		const entry: { graphics: Graphics; tweens: gsap.core.Tween[] } = { graphics: ripple, tweens: [] };
 
 		const onComplete = () => {
+			if (this.isDestroyed) return;
 			this.rippleLayer.removeChild(ripple);
 			ripple.destroy();
 			const idx = this.activeRipples.indexOf(entry);
@@ -636,6 +638,7 @@ export class BeaconObject {
 
 	/** Stop all tweens, animations, and clean up before removal */
 	destroy() {
+		this.isDestroyed = true;
 		// Remove ticker FIRST to prevent updateHalftone() from accessing destroyed sprites
 		if (this.animTick) {
 			gsap.ticker.remove(this.animTick);

@@ -90,6 +90,9 @@ export class CanvasRenderer {
 	/** Active stagger timeline — killed on canvas switch to prevent orphans */
 	private activeStaggerTl: gsap.core.Timeline | null = null;
 
+	/** Stored ticker callback for explicit cleanup */
+	private tickerFn: (() => void) | null = null;
+
 	/** Persistent container for grid/dot overlay — stays at correct z-position */
 	private overlayLayer!: Container;
 
@@ -162,11 +165,12 @@ export class CanvasRenderer {
 
 		// GSAP runs its own rAF loop — no manual update needed.
 		// Ticker handles interpolation, cursor staleness, and star parallax.
-		this.app.ticker.add(() => {
+		this.tickerFn = () => {
 			this.starField.update(this.world.x, this.world.y);
 			this.interpolateRemotes();
 			this.updateCursorStaleness();
-		});
+		};
+		this.app.ticker.add(this.tickerFn);
 	}
 
 	/**
@@ -193,6 +197,8 @@ export class CanvasRenderer {
 				this.world.removeChild(obj.container);
 				obj.container.destroy({ children: true });
 				this.objects.delete(id);
+				// Clean up orphaned remote drag targets for deleted objects
+				this.remoteObjectTargets.delete(id);
 			}
 		}
 
@@ -479,6 +485,7 @@ export class CanvasRenderer {
 			entry.container.destroy({ children: true });
 			this.remoteCursors.delete(userId);
 		}
+		this.cursorColorCache.delete(userId);
 	}
 
 	/** Remove all remote cursors (e.g. canvas switch) */
@@ -1189,7 +1196,15 @@ export class CanvasRenderer {
 			this.authCardObject = null;
 		}
 
+		// Remove ticker callback explicitly before app.destroy()
+		if (this.tickerFn) {
+			this.app.ticker.remove(this.tickerFn);
+			this.tickerFn = null;
+		}
+
 		this.removeAllRemoteCursors();
+		this.cursorColorCache.clear();
+		this.remoteObjectTargets.clear();
 		this.panZoom.destroy();
 		this.starField.destroy();
 		this.app.destroy(true, { children: true });

@@ -170,13 +170,8 @@ export const createDirectBeacon = mutation({
 		const oneHourAgo = Date.now() - 60 * 60 * 1000;
 		const recentBeacons = await ctx.db
 			.query("canvasObjects")
-			.withIndex("by_creator", (q) => q.eq("creatorId", user.uuid))
-			.filter((q) =>
-				q.and(
-					q.eq(q.field("type"), "beacon"),
-					q.gt(q.field("_creationTime"), oneHourAgo)
-				)
-			)
+			.withIndex("by_creator_type", (q) => q.eq("creatorId", user.uuid).eq("type", "beacon"))
+			.filter((q) => q.gt(q.field("_creationTime"), oneHourAgo))
 			.collect();
 		// Each direct beacon creates N+1 copies (recipients + self), so count unique groupIds
 		const uniqueGroups = new Set(recentBeacons.map((b) => b.directBeaconGroupId).filter(Boolean));

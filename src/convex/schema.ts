@@ -100,6 +100,7 @@ export default defineSchema({
 	})
 		.index("by_canvas", ["canvasId"])
 		.index("by_creator", ["creatorId"])
+		.index("by_creator_type", ["creatorId", "type"])
 		.index("by_type_expires", ["type", "expiresAt"])
 		.index("by_beacon_group", ["directBeaconGroupId"]),
 

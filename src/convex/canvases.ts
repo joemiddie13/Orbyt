@@ -19,8 +19,7 @@ export const getPersonalCanvas = query({
 
 		return ctx.db
 			.query("canvases")
-			.withIndex("by_owner", (q) => q.eq("ownerId", args.ownerId))
-			.filter((q) => q.eq(q.field("type"), "personal"))
+			.withIndex("by_owner_type", (q) => q.eq("ownerId", args.ownerId).eq("type", "personal"))
 			.first();
 	},
 });

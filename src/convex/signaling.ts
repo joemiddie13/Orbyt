@@ -100,9 +100,7 @@ export const cleanupStaleSignals = internalMutation({
 			.withIndex("by_created", (q) => q.lt("createdAt", cutoff))
 			.collect();
 
-		for (const signal of stale) {
-			await ctx.db.delete(signal._id);
-		}
+		await Promise.all(stale.map((signal) => ctx.db.delete(signal._id)));
 
 		return { cleaned: stale.length };
 	},

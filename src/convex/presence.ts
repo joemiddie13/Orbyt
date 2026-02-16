@@ -140,9 +140,7 @@ export const cleanupStalePresence = internalMutation({
 			.withIndex("by_last_seen", (q) => q.lt("lastSeen", cutoff))
 			.collect();
 
-		for (const record of stale) {
-			await ctx.db.delete(record._id);
-		}
+		await Promise.all(stale.map((record) => ctx.db.delete(record._id)));
 
 		return { cleaned: stale.length };
 	},
