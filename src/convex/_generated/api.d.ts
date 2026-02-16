@@ -27,6 +27,7 @@ import type * as signaling from "../signaling.js";
 import type * as stickers from "../stickers.js";
 import type * as users from "../users.js";
 import type * as validators from "../validators.js";
+import type * as wellness from "../wellness.js";
 
 import type {
   ApiFromModules,
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   stickers: typeof stickers;
   users: typeof users;
   validators: typeof validators;
+  wellness: typeof wellness;
 }>;
 
 /**
