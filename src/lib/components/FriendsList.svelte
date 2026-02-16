@@ -4,6 +4,13 @@
 	import gsap from 'gsap';
 	import { onMount, onDestroy } from 'svelte';
 
+	let {
+		onNavigateToFriend = undefined,
+	}: {
+		/** Called when user clicks a friend — navigates to their personal canvas */
+		onNavigateToFriend?: (friendUuid: string, displayName: string) => void;
+	} = $props();
+
 	const client = useConvexClient();
 	const friends = useQuery(api.friendships.getFriends, {});
 	const pendingRequests = useQuery(api.friendships.getPendingRequests, {});
@@ -149,15 +156,28 @@
 					<div class="dropdown-section">
 						<p class="section-label">Connected</p>
 						{#each friends.data as friend (friend.uuid)}
-							<div class="friend-row">
+							<button
+								class="friend-row"
+								onclick={() => {
+									if (onNavigateToFriend) {
+										onNavigateToFriend(friend.uuid, friend.displayName);
+										close();
+									}
+								}}
+							>
 								<div class="friend-avatar">
 									{friend.displayName.charAt(0).toUpperCase()}
 								</div>
-								<div>
+								<div class="friend-row-info">
 									<p class="friend-name">{friend.displayName}</p>
 									<p class="friend-username">@{friend.username}</p>
 								</div>
-							</div>
+								{#if onNavigateToFriend}
+									<svg class="friend-nav-arrow" width="14" height="14" viewBox="0 0 20 20" fill="none">
+										<path d="M7 4l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+									</svg>
+								{/if}
+							</button>
 						{/each}
 					</div>
 				{:else if !friends.isLoading}
@@ -315,10 +335,31 @@
 		padding: 6px 4px;
 		border-radius: 8px;
 		transition: background 0.15s;
+		width: 100%;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		text-align: left;
 	}
 
 	.friend-row:hover {
-		background: rgba(255, 255, 255, 0.04);
+		background: rgba(255, 255, 255, 0.06);
+	}
+
+	.friend-row-info {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.friend-nav-arrow {
+		color: rgba(255, 255, 255, 0.25);
+		flex-shrink: 0;
+		transition: color 0.15s, transform 0.15s;
+	}
+
+	.friend-row:hover .friend-nav-arrow {
+		color: rgba(255, 255, 255, 0.5);
+		transform: translateX(2px);
 	}
 
 	.friend-avatar {
