@@ -1,8 +1,10 @@
-# Astrophage
+# Orbyt
 
 A non-addictive social connection platform. No feeds, no algorithms, no like counts. Just a canvas where you see your people, make plans, and close the app.
 
 The entire UI is a PixiJS canvas — not a traditional web page. Users place objects on bounded canvases, create beacons (spontaneous or planned events), and connect in real life.
+
+**[orbyt.life](https://orbyt.life)**
 
 Built for the [**Built with Opus 4.6**](https://cerebralvalley.ai/e/claude-code-hackathon) hackathon, hosted by [Cerebral Valley](https://cerebralvalley.ai) & [Anthropic](https://anthropic.com). ([announcement](https://x.com/claudeai/status/2019833113418035237))
 
@@ -12,9 +14,10 @@ Built for the [**Built with Opus 4.6**](https://cerebralvalley.ai/e/claude-code-
 - **No infinite scroll** — bounded canvas spaces only
 - **No algorithmic ranking** — spatial or chronological arrangement
 - **No like counts** — sticker reactions only, no numbers
-- **No ads, no AI-generated content, no GPS/live location**
+- **No ads, no data harvesting, no GPS/live location**
 - **Creator controls content lifespan**
 - **Privacy-first** — username-only signup, no email required
+- **Your data, your rules** — user-owned, never sold, never exploited
 
 ## Tech Stack
 
@@ -22,6 +25,7 @@ Built for the [**Built with Opus 4.6**](https://cerebralvalley.ai/e/claude-code-
 - **PixiJS v8** — WebGL canvas rendering
 - **Convex** — Real-time backend with WebSocket sync
 - **Better Auth** — Username/password authentication
+- **Claude Opus 4.6** — AI-assisted beacon creation (activity suggestions based on location, interests, and time)
 - **GSAP** + PixiPlugin — Canvas and UI animations
 - **Tailwind CSS v4** — Styling for UI overlays
 - **Motion** — DOM/UI animations
@@ -89,8 +93,9 @@ The canvas IS the app. There are no traditional HTML pages or route-based views.
 
 ### Canvas Objects
 - **Notes** — Rich text sticky notes with Tiptap inline editing, 5 color swatches, bold/italic/headings/lists, 8-direction free resize, auto-expanding height
-- **Beacons** — Living broadcast signals for spontaneous or planned events. Halftone dot display (sprite-based, inspired by ASCII/dither art), ripple emanation, cascading heartbeat pulse, signal dot antenna, layered ambient glow. Natural language time input ("in 30 min", "tomorrow at 3pm")
+- **Beacons** — Living broadcast signals for spontaneous or planned events. Halftone dot display (sprite-based, inspired by ASCII/dither art), ripple emanation, cascading heartbeat pulse, signal dot antenna, layered ambient glow. Natural language time input ("in 30 min", "tomorrow at 3pm"). AI-assisted activity suggestions powered by Claude Opus 4.6.
 - **Photos** — Polaroid-style cards with white frame, random tilt, drop shadow. Upload via Convex file storage with server-side MIME validation. Editable captions.
+- **Music** — Dark card objects with oEmbed metadata (Spotify, YouTube, YouTube Music, Apple Music). Thumbnail, title, artist, platform badge. Play-on-card with morph embeds. Draggable iframe overlay that tracks pan/zoom.
 
 ### Social
 - **Friend codes** — Add friends by sharing unique codes
@@ -114,10 +119,10 @@ Three full audit passes completed. Every Convex mutation validates:
 - **Authentication** — `getAuthenticatedUser()` verifies auth token
 - **Authorization** — `checkCanvasAccess()` enforces RBAC (viewer < member < owner)
 - **Input bounds** — Positions within canvas (0-3000, 0-2000), string lengths capped, file types validated server-side
-- **Rate limits** — Max 10 direct beacons per user per hour, max 50 recipients per beacon, max 5 stickers per user per object
+- **Rate limits** — Max 10 direct beacons per user per hour, max 50 recipients per beacon, max 5 stickers per user per object, max 20 friend requests per hour, max 200 objects per canvas
 - **Time validation** — Beacon start not in past (1min grace), max 90-day duration
 - **Cascade deletes** — Removing objects cleans up associated responses and stickers
-- **CSP headers** — Configured in hooks, Convex domains whitelisted
+- **CSP headers** — Hardened with `base-uri`, `form-action`, `frame-ancestors`, Convex domains whitelisted
 
 ## Security Roadmap
 
@@ -127,16 +132,16 @@ Authentication currently uses username/password via Better Auth. The auth layer 
 
 ## Future: Privacy, Security & Encryption
 
-Astrophage is built on the belief that social platforms should respect user privacy, give people ownership of their data, and never exploit attention for profit. Here's where we're headed.
+Orbyt is built on the belief that social platforms should respect user privacy, give people ownership of their data, and never exploit attention for profit. Here's where we're headed.
 
 ### AT Protocol Integration
 
-We've researched the [AT Protocol](https://atproto.com/) (the decentralized social protocol behind Bluesky) as a long-term foundation for Astrophage. The protocol's values — user data ownership, account portability, no platform lock-in — align directly with ours.
+We've researched the [AT Protocol](https://atproto.com/) (the decentralized social protocol behind Bluesky) as a long-term foundation for Orbyt. The protocol's values — user data ownership, account portability, no platform lock-in — align directly with ours.
 
 **What fits well:**
 - **Decentralized identity (DIDs)** replace usernames with portable, cryptographic identifiers. Users could sign in with their Bluesky handle or any AT Protocol identity — no passwords to manage, no vendor lock-in.
-- **User-owned data repositories** mean your canvas objects, beacons, and social connections belong to you, not to us. If Astrophage ever shuts down, your data lives on.
-- **Custom Lexicon schemas** (`com.astrophage.*`) would let us define canvas-native record types that other apps could read and interoperate with.
+- **User-owned data repositories** mean your canvas objects, beacons, and social connections belong to you, not to us. If Orbyt ever shuts down, your data lives on.
+- **Custom Lexicon schemas** (`com.orbyt.*`) would let us define canvas-native record types that other apps could read and interoperate with.
 - **Our auth abstraction layer** (`src/lib/auth/`) was designed from day one for this migration — only a single file needs to change.
 
 **What doesn't fit yet:**
@@ -173,6 +178,19 @@ No matter what protocols or encryption schemes we adopt, these principles don't 
 - **Data portability.** Users should be able to leave and take everything with them.
 - **Transparency.** The code is open source (AGPL-3.0). The roadmap is public. Trust is earned, not assumed.
 
+## Business Model
+
+Orbyt will never run ads, sell data, or exploit attention. The platform is funded entirely by voluntary donations — inspired by [Wikipedia](https://wikimediafoundation.org/) and [Signal](https://signal.org/). Users can donate any amount monthly or whenever they choose.
+
+**Where donations go:**
+1. **Keep Orbyt running** — hosting, infrastructure, development. We publish exactly what this costs.
+2. **Give back** — surplus funds go to charities and organizations, with a focus on:
+   - **Protecting people affected by AI** — creative workers, displaced communities, those facing algorithmic bias
+   - **AI for good** — medical research, environmental science, public policy
+   - **Digital rights** — privacy, encryption, open internet advocacy
+
+We're evaluating [Open Collective](https://opencollective.com/) for transparent financial reporting alongside direct donations, so every dollar in and out is publicly visible.
+
 ## Project Status
 
 - **Layer 1** — Canvas foundation (pan/zoom with momentum + rubber-band edges, drag-drop, TextBlock objects)
@@ -181,11 +199,13 @@ No matter what protocols or encryption schemes we adopt, these principles don't 
 - **WebRTC** — Real-time cursor presence and drag streaming via native RTCPeerConnection data channels
 - **Rich text** — Tiptap inline editor with HTMLText rendering, formatting toolbar, color picker
 - **Photos** — Polaroid-style photo objects with Convex file storage
+- **Music** — Dark card objects with play-on-card, morph embeds, platform detection (Spotify, YouTube, Apple Music)
 - **Visual redesign** — "Cozy Campfire in Space" — dark glass UI, parallax stars, animated toolbar, Satoshi font
 - **Living beacons** — Halftone dot display, ripple emanation, cascading heartbeat, signal dot antenna
 - **Performance** — cacheAsTexture, boundsArea, GSAP lagSmoothing (0.1ms median frame time)
-- **Security** — Three audit passes, RBAC on all mutations, input validation, rate limits, cascade deletes
-- **Next** — Music link cards, Rive animations, mobile app (Friendship Health dashboard), demo prep
+- **Security** — Three audit passes, RBAC on all mutations, input validation, rate limits, CSP hardening, cascade deletes
+- **In progress** — Landing page (orbyt.life), AI-assisted beacon creation, deployment
+- **Next** — Rive animations, mobile app (Friendship Health dashboard)
 
 ## License
 
