@@ -24,3 +24,9 @@ export interface SignInParams {
 	username: string;
 	password: string;
 }
+
+export interface Passkey {
+	id: string;
+	name?: string;
+	createdAt: Date;
+}

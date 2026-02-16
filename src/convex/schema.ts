@@ -10,6 +10,8 @@ export default defineSchema({
 		avatarUrl: v.optional(v.string()),
 		email: v.optional(v.string()),
 		friendCode: v.optional(v.string()),
+		recoveryCodeHashes: v.optional(v.array(v.string())),
+		recoveryCodesCreatedAt: v.optional(v.number()),
 	})
 		.index("by_uuid", ["uuid"])
 		.index("by_username", ["username"])
