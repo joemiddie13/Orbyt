@@ -67,6 +67,9 @@ export function validateBeaconTiming(startTime: number, endTime: number) {
 	if (endTime - startTime > MAX_BEACON_DURATION_MS) {
 		throw new Error("Beacon duration cannot exceed 90 days");
 	}
+	if (endTime - Date.now() > MAX_BEACON_DURATION_MS) {
+		throw new Error("Beacon cannot expire more than 90 days from now");
+	}
 }
 
 /** Validate beacon text fields (title, description, location) */

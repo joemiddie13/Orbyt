@@ -112,6 +112,17 @@ export const create = mutation({
 			throw new Error("Canvas is full — remove some objects first");
 		}
 
+		// Rate limit: max 20 objects per minute per user (prevents churn spam)
+		const oneMinuteAgo = Date.now() - 60_000;
+		const recentByUser = await ctx.db
+			.query("canvasObjects")
+			.withIndex("by_creator_type", (q) => q.eq("creatorId", user.uuid).eq("type", args.type))
+			.filter((q) => q.gt(q.field("_creationTime"), oneMinuteAgo))
+			.collect();
+		if (recentByUser.length >= 20) {
+			throw new Error("Creating too fast — slow down and try again");
+		}
+
 		// Type-specific validation
 		if (args.type === "textblock") {
 			const content = args.content as { text: string; color: number; title?: string };

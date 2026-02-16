@@ -458,20 +458,24 @@ export class CanvasRenderer {
 
 	/** Show or update a remote user's cursor on the canvas */
 	updateRemoteCursor(userId: string, username: string, worldX: number, worldY: number) {
+		// Clamp peer-supplied coordinates to canvas bounds (prevents rendering at extreme positions)
+		const clampedX = Math.max(-100, Math.min(CANVAS_WIDTH + 100, worldX));
+		const clampedY = Math.max(-100, Math.min(CANVAS_HEIGHT + 100, worldY));
+
 		let entry = this.remoteCursors.get(userId);
 
 		if (!entry) {
 			const container = this.createCursorVisual(userId, username);
-			container.x = worldX;
-			container.y = worldY;
+			container.x = clampedX;
+			container.y = clampedY;
 			this.world.addChild(container);
-			entry = { container, lastUpdate: Date.now(), targetX: worldX, targetY: worldY };
+			entry = { container, lastUpdate: Date.now(), targetX: clampedX, targetY: clampedY };
 			this.remoteCursors.set(userId, entry);
 		}
 
 		// Set interpolation target — ticker will lerp toward it
-		entry.targetX = worldX;
-		entry.targetY = worldY;
+		entry.targetX = clampedX;
+		entry.targetY = clampedY;
 		entry.container.alpha = 1;
 		entry.container.visible = true;
 		entry.lastUpdate = Date.now();
@@ -499,8 +503,11 @@ export class CanvasRenderer {
 	moveObjectRemotely(objectId: string, x: number, y: number) {
 		const obj = this.objects.get(objectId);
 		if (!obj) return;
+		// Clamp peer-supplied coordinates to canvas bounds
+		const clampedX = Math.max(0, Math.min(CANVAS_WIDTH, x));
+		const clampedY = Math.max(0, Math.min(CANVAS_HEIGHT, y));
 		// Set interpolation target — ticker will lerp toward it
-		this.remoteObjectTargets.set(objectId, { x, y });
+		this.remoteObjectTargets.set(objectId, { x: clampedX, y: clampedY });
 	}
 
 	/** Stop interpolating an object (drag ended, Convex will set final position) */

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { authComponent } from "./auth";
 
@@ -116,6 +116,15 @@ export const ensureFriendCode = mutation({
 		const friendCode = await generateFriendCode(ctx);
 		await ctx.db.patch(user._id, { friendCode });
 		return friendCode;
+	},
+});
+
+/** Verify the caller is authenticated — for use by actions via ctx.runQuery */
+export const verifyAuth = internalQuery({
+	args: {},
+	handler: async (ctx) => {
+		const user = await getAuthenticatedUser(ctx);
+		return user.uuid;
 	},
 });
 

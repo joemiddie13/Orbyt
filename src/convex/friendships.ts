@@ -32,8 +32,9 @@ export const sendRequest = mutation({
 			.withIndex("by_friend_code", (q) => q.eq("friendCode", args.friendCode))
 			.first();
 
-		if (!target) throw new Error("No user found with that friend code");
-		if (target.uuid === user.uuid) throw new Error("Can't add yourself");
+		if (!target || target.uuid === user.uuid) {
+			throw new Error("Unable to process friend request");
+		}
 
 		// Rate limit: max 20 friend requests per hour
 		const oneHourAgo = Date.now() - 60 * 60 * 1000;
@@ -54,8 +55,9 @@ export const sendRequest = mutation({
 			.withIndex("by_pair", (q) => q.eq("requesterId", user.uuid).eq("receiverId", target.uuid))
 			.first();
 		if (existingForward) {
-			if (existingForward.status === "accepted") throw new Error("Already friends");
-			if (existingForward.status === "pending") throw new Error("Request already sent");
+			if (existingForward.status === "accepted" || existingForward.status === "pending") {
+				throw new Error("Unable to process friend request");
+			}
 			// If declined, allow re-requesting by updating status
 			await ctx.db.patch(existingForward._id, { status: "pending", createdAt: Date.now() });
 			return existingForward._id;
@@ -66,7 +68,9 @@ export const sendRequest = mutation({
 			.withIndex("by_pair", (q) => q.eq("requesterId", target.uuid).eq("receiverId", user.uuid))
 			.first();
 		if (existingReverse) {
-			if (existingReverse.status === "accepted") throw new Error("Already friends");
+			if (existingReverse.status === "accepted") {
+				throw new Error("Unable to process friend request");
+			}
 			if (existingReverse.status === "pending") {
 				// They already sent us a request — auto-accept
 				await ctx.db.patch(existingReverse._id, { status: "accepted" });

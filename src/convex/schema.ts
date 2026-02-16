@@ -19,7 +19,7 @@ export default defineSchema({
 	canvases: defineTable({
 		ownerId: v.string(), // UUID, not Convex _id — portable for AT Protocol
 		name: v.string(),
-		type: v.union(v.literal("personal"), v.literal("shared"), v.literal("public")),
+		type: v.union(v.literal("personal"), v.literal("shared")),
 		bounds: v.object({
 			width: v.number(),
 			height: v.number(),

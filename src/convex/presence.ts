@@ -50,6 +50,7 @@ export const heartbeat = mutation({
 			return;
 		}
 
+		const now = Date.now();
 		const existing = await ctx.db
 			.query("canvasPresence")
 			.withIndex("by_canvas_user", (q) =>
@@ -58,14 +59,16 @@ export const heartbeat = mutation({
 			.first();
 
 		if (existing) {
-			await ctx.db.patch(existing._id, { lastSeen: Date.now() });
+			// Server-side throttle: ignore heartbeats less than 20s apart
+			if (now - existing.lastSeen < 20_000) return;
+			await ctx.db.patch(existing._id, { lastSeen: now });
 		} else {
 			await ctx.db.insert("canvasPresence", {
 				canvasId: args.canvasId,
 				userId: user.uuid,
 				username: user.username,
 				displayName: user.displayName,
-				lastSeen: Date.now(),
+				lastSeen: now,
 			});
 		}
 	},

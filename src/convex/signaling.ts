@@ -29,6 +29,17 @@ export const sendSignal = mutation({
 			throw new Error("Signal payload too large");
 		}
 
+		// Rate limit: max 30 signals per minute per user (prevents signaling flood)
+		const oneMinuteAgo = Date.now() - 60_000;
+		const recentSignals = await ctx.db
+			.query("signalingMessages")
+			.withIndex("by_created", (q) => q.gt("createdAt", oneMinuteAgo))
+			.filter((q) => q.eq(q.field("fromUserId"), user.uuid))
+			.collect();
+		if (recentSignals.length >= 30) {
+			throw new Error("Signaling too fast — try again in a moment");
+		}
+
 		// Both sender and recipient must have canvas access
 		await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
 		try {

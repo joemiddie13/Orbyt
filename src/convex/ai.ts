@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 interface AISuggestion {
 	activity: string;
@@ -17,7 +18,18 @@ export const suggestActivities = action({
 		dayOfWeek: v.string(),
 		friendCount: v.number(),
 	},
-	handler: async (_ctx, args): Promise<AISuggestion[]> => {
+	handler: async (ctx, args): Promise<AISuggestion[]> => {
+		// Verify caller is authenticated
+		await ctx.runQuery(internal.users.verifyAuth);
+
+		// Input validation: cap prompt length to prevent abuse
+		if (args.prompt.length > 500) {
+			throw new Error("Prompt must be 500 characters or less");
+		}
+		if (args.friendCount < 0 || args.friendCount > 50) {
+			throw new Error("Invalid friend count");
+		}
+
 		const apiKey = process.env.ANTHROPIC_API_KEY;
 		if (!apiKey) {
 			throw new Error("AI suggestions not configured");

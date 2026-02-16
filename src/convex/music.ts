@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { action, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getAuthenticatedUser } from "./users";
 import { checkCanvasAccess } from "./access";
 import {
@@ -9,6 +10,32 @@ import {
 	MAX_MUSIC_TITLE_LENGTH,
 	MAX_MUSIC_ARTIST_LENGTH,
 } from "./validators";
+
+/** Allowed thumbnail URL domains from oEmbed responses */
+const ALLOWED_THUMBNAIL_DOMAINS = [
+	"i.scdn.co",
+	"mosaic.scdn.co",
+	"i.ytimg.com",
+	"is1-ssl.mzstatic.com",
+	"is2-ssl.mzstatic.com",
+	"is3-ssl.mzstatic.com",
+	"is4-ssl.mzstatic.com",
+	"is5-ssl.mzstatic.com",
+];
+
+/** Validate that a thumbnail URL is from a trusted domain */
+function validateThumbnailUrl(url: string | undefined): string | undefined {
+	if (!url) return undefined;
+	try {
+		const parsed = new URL(url);
+		const isTrusted = ALLOWED_THUMBNAIL_DOMAINS.some(
+			(domain) => parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`)
+		);
+		return isTrusted ? url : undefined;
+	} catch {
+		return undefined;
+	}
+}
 
 // ── oEmbed metadata fetching ────────────────────────────────────────
 
@@ -68,7 +95,7 @@ async function fetchSpotifyMetadata(url: string): Promise<MusicMetadata> {
 		platform: "spotify",
 		title: title.slice(0, MAX_MUSIC_TITLE_LENGTH),
 		artist: artist.slice(0, MAX_MUSIC_ARTIST_LENGTH),
-		thumbnailUrl: data.thumbnail_url,
+		thumbnailUrl: validateThumbnailUrl(data.thumbnail_url),
 		embedUrl,
 	};
 }
@@ -88,7 +115,7 @@ async function fetchYouTubeMetadata(url: string, platform: "youtube" | "youtube-
 		platform,
 		title: (data.title ?? "Unknown").slice(0, MAX_MUSIC_TITLE_LENGTH),
 		artist: (data.author_name ?? "").slice(0, MAX_MUSIC_ARTIST_LENGTH),
-		thumbnailUrl: data.thumbnail_url,
+		thumbnailUrl: validateThumbnailUrl(data.thumbnail_url),
 		embedUrl,
 	};
 }
@@ -125,7 +152,7 @@ async function fetchAppleMusicMetadata(url: string): Promise<MusicMetadata> {
 		platform: "apple-music",
 		title: title.slice(0, MAX_MUSIC_TITLE_LENGTH),
 		artist: artist.slice(0, MAX_MUSIC_ARTIST_LENGTH),
-		thumbnailUrl: imageMatch?.[1],
+		thumbnailUrl: validateThumbnailUrl(imageMatch?.[1]),
 		embedUrl: buildAppleMusicEmbedUrl(url),
 	};
 }
@@ -134,7 +161,10 @@ async function fetchAppleMusicMetadata(url: string): Promise<MusicMetadata> {
 
 export const fetchMusicMetadata = action({
 	args: { url: v.string() },
-	handler: async (_ctx, args) => {
+	handler: async (ctx, args) => {
+		// Verify caller is authenticated (actions don't have ctx.db — use internal query)
+		await ctx.runQuery(internal.users.verifyAuth);
+
 		const platform = validateMusicUrl(args.url);
 
 		switch (platform) {
