@@ -13,6 +13,9 @@ const csp = [
 	`connect-src 'self' wss://*.convex.cloud https://*.convex.cloud${isDev ? " ws://localhost:* http://localhost:*" : ""}`,
 	"frame-src https://open.spotify.com https://www.youtube.com https://embed.music.apple.com",
 	"worker-src 'self' blob:",
+	"base-uri 'self'",
+	"form-action 'self'",
+	"frame-ancestors 'none'",
 ].join("; ");
 
 export const handle: Handle = async ({ event, resolve }) => {

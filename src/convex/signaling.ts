@@ -55,6 +55,12 @@ export const getSignals = query({
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return [];
 
+		try {
+			await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
+		} catch {
+			return [];
+		}
+
 		return ctx.db
 			.query("signalingMessages")
 			.withIndex("by_canvas_recipient", (q) =>
@@ -73,6 +79,13 @@ export const consumeSignal = mutation({
 		if (!signal) return;
 		// Only the recipient can consume their own signals
 		if (signal.toUserId !== user.uuid) return;
+
+		try {
+			await checkCanvasAccess(ctx, signal.canvasId, user.uuid, "viewer");
+		} catch {
+			return; // Access revoked — stale signal cron will clean up
+		}
+
 		await ctx.db.delete(args.signalId);
 	},
 });

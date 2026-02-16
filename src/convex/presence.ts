@@ -78,6 +78,12 @@ export const leaveCanvas = mutation({
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return;
 
+		try {
+			await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
+		} catch {
+			return;
+		}
+
 		const existing = await ctx.db
 			.query("canvasPresence")
 			.withIndex("by_canvas_user", (q) =>

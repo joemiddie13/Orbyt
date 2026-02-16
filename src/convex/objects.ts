@@ -103,6 +103,15 @@ export const create = mutation({
 		// Verify caller has member+ access to the canvas
 		await checkCanvasAccess(ctx, args.canvasId, user.uuid, "member");
 
+		// Rate limit: max 200 objects per canvas
+		const existingObjects = await ctx.db
+			.query("canvasObjects")
+			.withIndex("by_canvas", (q) => q.eq("canvasId", args.canvasId))
+			.collect();
+		if (existingObjects.length >= 200) {
+			throw new Error("Canvas is full — remove some objects first");
+		}
+
 		// Type-specific validation
 		if (args.type === "textblock") {
 			const content = args.content as { text: string; color: number; title?: string };

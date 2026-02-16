@@ -35,6 +35,19 @@ export const sendRequest = mutation({
 		if (!target) throw new Error("No user found with that friend code");
 		if (target.uuid === user.uuid) throw new Error("Can't add yourself");
 
+		// Rate limit: max 20 friend requests per hour
+		const oneHourAgo = Date.now() - 60 * 60 * 1000;
+		const recentPending = await ctx.db
+			.query("friendships")
+			.withIndex("by_requester_status", (q) =>
+				q.eq("requesterId", user.uuid).eq("status", "pending"),
+			)
+			.filter((q) => q.gt(q.field("createdAt"), oneHourAgo))
+			.collect();
+		if (recentPending.length >= 20) {
+			throw new Error("Too many requests — try again later");
+		}
+
 		// Check if a friendship already exists in either direction
 		const existingForward = await ctx.db
 			.query("friendships")
