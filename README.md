@@ -4,6 +4,8 @@ A non-addictive social connection platform. No feeds, no algorithms, no like cou
 
 **[orbyt.life](https://orbyt.life)**
 
+Built for the [**Built with Opus 4.6**](https://cerebralvalley.ai/e/claude-code-hackathon) hackathon, hosted by [Cerebral Valley](https://cerebralvalley.ai) & [Anthropic](https://anthropic.com).
+
 > Originally codenamed *Astrophage*, after the organism in [Project Hail Mary](https://en.wikipedia.org/wiki/Project_Hail_Mary) that was simultaneously a threat and a bridge between worlds — just like social technology can either isolate us or genuinely connect us.
 
 <!-- TODO: Add screenshot/GIF of the canvas in action -->
