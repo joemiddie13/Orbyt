@@ -1,3 +1,4 @@
+import 'pixi.js/unsafe-eval'; // Use alternative shader compiler that doesn't require CSP unsafe-eval
 import { Application, Container, Graphics, Rectangle, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
 import './gsapInit'; // Ensure GSAP + PixiPlugin registered before any object creation
 import { gsap } from './gsapInit';
