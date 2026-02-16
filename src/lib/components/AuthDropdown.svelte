@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { signUp, signIn } from '$lib/auth';
+	import { signUp, signIn, signInWithPasskey, resetWithRecoveryCode } from '$lib/auth';
 	import gsap from 'gsap';
 	import { onMount, onDestroy } from 'svelte';
 
@@ -15,12 +15,19 @@
 	let popover = $state<HTMLDivElement>(undefined!);
 	let trigger = $state<HTMLButtonElement>(undefined!);
 
-	let mode: 'signin' | 'signup' = $state(initialMode);
+	let mode: 'signin' | 'signup' | 'recovery' = $state(initialMode);
 	let username = $state('');
 	let password = $state('');
 	let displayName = $state('');
 	let error = $state('');
 	let isSubmitting = $state(false);
+
+	// Recovery form fields
+	let recoveryCode = $state('');
+	let newPassword = $state('');
+	let confirmPassword = $state('');
+
+	let supportsPasskeys = $state(false);
 
 	// Sync mode from prop when dropdown is reopened
 	$effect(() => {
@@ -52,9 +59,56 @@
 		});
 	}
 
-	function switchMode(newMode: 'signin' | 'signup') {
+	function switchMode(newMode: 'signin' | 'signup' | 'recovery') {
 		mode = newMode;
 		error = '';
+	}
+
+	async function handlePasskeySignIn() {
+		error = '';
+		isSubmitting = true;
+		try {
+			const result = await signInWithPasskey();
+			if (result.error) {
+				error = result.error;
+			} else {
+				close();
+				onAuthSuccess?.();
+			}
+		} catch {
+			error = 'Passkey sign-in failed.';
+		} finally {
+			isSubmitting = false;
+		}
+	}
+
+	async function handleRecovery(e: Event) {
+		e.preventDefault();
+		error = '';
+		if (newPassword !== confirmPassword) {
+			error = 'Passwords do not match';
+			return;
+		}
+		isSubmitting = true;
+		try {
+			const result = await resetWithRecoveryCode(username, recoveryCode, newPassword);
+			if (result.error) {
+				error = result.error;
+			} else {
+				const signInResult = await signIn({ username, password: newPassword });
+				if (signInResult.error) {
+					error = 'Password reset, but sign-in failed. Try signing in manually.';
+					mode = 'signin';
+				} else {
+					close();
+					onAuthSuccess?.();
+				}
+			}
+		} catch {
+			error = 'Recovery failed.';
+		} finally {
+			isSubmitting = false;
+		}
 	}
 
 	async function handleSubmit(e: Event) {
@@ -106,6 +160,7 @@
 	}
 
 	onMount(() => {
+		supportsPasskeys = typeof window !== 'undefined' && !!window.PublicKeyCredential;
 		document.addEventListener('pointerdown', handleClickOutside);
 		window.addEventListener('keydown', handleKeydown);
 	});
@@ -151,52 +206,85 @@
 			</div>
 
 			<div class="dropdown-content">
-				<form onsubmit={handleSubmit} class="auth-form">
-					{#if mode === 'signup'}
+				{#if mode === 'recovery'}
+					<form onsubmit={handleRecovery} class="auth-form">
+						<input type="text" bind:value={username} placeholder="Username" required autocomplete="username" class="auth-input" />
+						<input type="text" bind:value={recoveryCode} placeholder="Recovery code" required class="auth-input" style="font-family: monospace; letter-spacing: 0.1em;" />
+						<input type="password" bind:value={newPassword} placeholder="New password" required minlength="10" maxlength="64" autocomplete="new-password" class="auth-input" />
+						<input type="password" bind:value={confirmPassword} placeholder="Confirm password" required minlength="10" maxlength="64" autocomplete="new-password" class="auth-input" />
+
+						{#if error}
+							<p class="error-msg">{error}</p>
+						{/if}
+
+						<button type="submit" disabled={isSubmitting} class="submit-btn">
+							{isSubmitting ? '...' : 'Reset Password'}
+						</button>
+					</form>
+					<p class="back-link">
+						<button onclick={() => switchMode('signin')}>Back to sign in</button>
+					</p>
+				{:else}
+					<form onsubmit={handleSubmit} class="auth-form">
+						{#if mode === 'signup'}
+							<input
+								type="text"
+								bind:value={displayName}
+								placeholder="Display name"
+								class="auth-input"
+							/>
+						{/if}
+
 						<input
 							type="text"
-							bind:value={displayName}
-							placeholder="Display name"
+							bind:value={username}
+							placeholder="Username"
+							required
+							autocomplete="username"
 							class="auth-input"
 						/>
-					{/if}
 
-					<input
-						type="text"
-						bind:value={username}
-						placeholder="Username"
-						required
-						autocomplete="username"
-						class="auth-input"
-					/>
+						<input
+							type="password"
+							bind:value={password}
+							placeholder="Password"
+							required
+							minlength="10"
+							maxlength="64"
+							autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
+							class="auth-input"
+						/>
 
-					<input
-						type="password"
-						bind:value={password}
-						placeholder="Password"
-						required
-						minlength="10"
-						maxlength="64"
-						autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
-						class="auth-input"
-					/>
-
-					{#if error}
-						<p class="error-msg">{error}</p>
-					{/if}
-
-					<button
-						type="submit"
-						disabled={isSubmitting}
-						class="submit-btn"
-					>
-						{#if isSubmitting}
-							...
-						{:else}
-							{mode === 'signin' ? 'Sign In' : 'Create Account'}
+						{#if error}
+							<p class="error-msg">{error}</p>
 						{/if}
-					</button>
-				</form>
+
+						<button
+							type="submit"
+							disabled={isSubmitting}
+							class="submit-btn"
+						>
+							{#if isSubmitting}
+								...
+							{:else}
+								{mode === 'signin' ? 'Sign In' : 'Create Account'}
+							{/if}
+						</button>
+					</form>
+
+					{#if mode === 'signin' && supportsPasskeys}
+						<div class="divider"><span>or</span></div>
+						<button onclick={handlePasskeySignIn} disabled={isSubmitting} class="passkey-btn">
+							Sign in with Passkey
+						</button>
+					{/if}
+
+					{#if mode === 'signin'}
+						<p class="back-link">
+							<button onclick={() => switchMode('recovery')}>Forgot password?</button>
+						</p>
+					{/if}
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -323,5 +411,62 @@
 	.submit-btn:disabled {
 		opacity: 0.5;
 		cursor: default;
+	}
+
+	.divider {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin: 12px 0;
+	}
+
+	.divider::before,
+	.divider::after {
+		content: '';
+		flex: 1;
+		height: 1px;
+		background: rgba(255, 255, 255, 0.08);
+	}
+
+	.divider span {
+		font-size: 11px;
+		color: rgba(255, 255, 255, 0.25);
+	}
+
+	.passkey-btn {
+		width: 100%;
+		padding: 10px;
+		border-radius: 10px;
+		font-size: 13px;
+		font-weight: 500;
+		background: rgba(255, 255, 255, 0.05);
+		color: rgba(255, 255, 255, 0.6);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		cursor: pointer;
+		transition: all 0.15s;
+	}
+
+	.passkey-btn:hover:not(:disabled) {
+		background: rgba(255, 255, 255, 0.08);
+		color: rgba(255, 255, 255, 0.8);
+	}
+
+	.back-link {
+		text-align: center;
+		margin-top: 10px;
+	}
+
+	.back-link button {
+		font-size: 11px;
+		color: rgba(255, 255, 255, 0.3);
+		background: none;
+		border: none;
+		cursor: pointer;
+		transition: color 0.15s;
+	}
+
+	.back-link button:hover {
+		color: rgba(255, 255, 255, 0.6);
+		text-decoration: underline;
 	}
 </style>

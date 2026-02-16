@@ -20,6 +20,8 @@ import type * as music from "../music.js";
 import type * as objects from "../objects.js";
 import type * as photos from "../photos.js";
 import type * as presence from "../presence.js";
+import type * as recovery from "../recovery.js";
+import type * as recoveryActions from "../recoveryActions.js";
 import type * as responses from "../responses.js";
 import type * as signaling from "../signaling.js";
 import type * as stickers from "../stickers.js";
@@ -45,6 +47,8 @@ declare const fullApi: ApiFromModules<{
   objects: typeof objects;
   photos: typeof photos;
   presence: typeof presence;
+  recovery: typeof recovery;
+  recoveryActions: typeof recoveryActions;
   responses: typeof responses;
   signaling: typeof signaling;
   stickers: typeof stickers;

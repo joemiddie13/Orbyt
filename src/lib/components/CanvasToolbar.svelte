@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { signOut } from '$lib/auth';
+	import { signOut, registerPasskey } from '$lib/auth';
 	import gsap from 'gsap';
 	import { onMount, onDestroy } from 'svelte';
 	import CanvasSwitcher from './CanvasSwitcher.svelte';
 	import FriendCodeModal from './FriendCodeModal.svelte';
 	import FriendsList from './FriendsList.svelte';
 	import AuthDropdown from './AuthDropdown.svelte';
+	import RecoveryCodesModal from './RecoveryCodesModal.svelte';
 
 	let {
 		username,
@@ -50,6 +51,14 @@
 	} = $props();
 
 	let isSigningOut = $state(false);
+
+	// Account menu state
+	let accountMenuOpen = $state(false);
+	let accountMenuEl = $state<HTMLDivElement>(undefined!);
+	let accountBtnEl = $state<HTMLButtonElement>(undefined!);
+	let supportsPasskeys = $state(false);
+	let passkeyStatus = $state<string>('');
+	let showRecoveryModal = $state(false);
 
 	// Beacon button ref for funky color cycling
 	let beaconBtn: HTMLButtonElement = $state(undefined!);
@@ -102,6 +111,9 @@
 	let idleTweens: gsap.core.Tween[] = [];
 
 	onMount(() => {
+		supportsPasskeys = typeof window !== 'undefined' && !!window.PublicKeyCredential;
+		document.addEventListener('pointerdown', handleAccountMenuClickOutside);
+
 		// Note sparkle idle — opacity breathe
 		if (noteSparkle) {
 			idleTweens.push(
@@ -160,6 +172,9 @@
 		idleTweens = [];
 		beaconGlowTimeline?.kill();
 		beaconGlowTimeline = null;
+		if (typeof document !== 'undefined') {
+			document.removeEventListener('pointerdown', handleAccountMenuClickOutside);
+		}
 	});
 
 	function noteEnter() {
@@ -197,8 +212,57 @@
 		tl.fromTo(musicWave2, { scale: 0.8, opacity: 0.2, transformOrigin: '50% 50%' }, { scale: 1.2, opacity: 0.7, duration: 0.25, ease: 'power2.out' }, 0.08);
 	}
 
+	function toggleAccountMenu() {
+		if (accountMenuOpen) {
+			closeAccountMenu();
+		} else {
+			accountMenuOpen = true;
+			passkeyStatus = '';
+			requestAnimationFrame(() => {
+				if (!accountMenuEl) return;
+				gsap.fromTo(accountMenuEl,
+					{ scale: 0.6, opacity: 0, transformOrigin: 'top center' },
+					{ scale: 1, opacity: 1, duration: 0.25, ease: 'back.out(2)' }
+				);
+			});
+		}
+	}
+
+	function closeAccountMenu() {
+		if (!accountMenuOpen || !accountMenuEl) { accountMenuOpen = false; return; }
+		gsap.to(accountMenuEl, {
+			scale: 0.6, opacity: 0, duration: 0.15, ease: 'power2.in',
+			transformOrigin: 'top center',
+			onComplete: () => { accountMenuOpen = false; },
+		});
+	}
+
+	function handleAccountMenuClickOutside(e: MouseEvent) {
+		if (!accountMenuOpen) return;
+		const target = e.target as HTMLElement;
+		if (accountBtnEl?.contains(target) || accountMenuEl?.contains(target)) return;
+		closeAccountMenu();
+	}
+
+	async function handleSetupPasskey() {
+		passkeyStatus = 'Registering...';
+		const result = await registerPasskey();
+		if (result.error) {
+			passkeyStatus = result.error;
+		} else {
+			passkeyStatus = 'Passkey registered!';
+			setTimeout(() => { passkeyStatus = ''; }, 3000);
+		}
+	}
+
+	function handleOpenRecoveryCodes() {
+		showRecoveryModal = true;
+		closeAccountMenu();
+	}
+
 	async function handleSignOut() {
 		isSigningOut = true;
+		closeAccountMenu();
 		await signOut();
 	}
 </script>
@@ -338,13 +402,66 @@
 		<!-- Friends list dropdown -->
 		<FriendsList />
 
-		<button
-			onclick={handleSignOut}
-			disabled={isSigningOut}
-			class="lego-btn lego-btn-sm lego-neutral"
-		>
-			Sign out
-		</button>
+		<!-- Account dropdown -->
+		<div class="relative">
+			<button
+				bind:this={accountBtnEl}
+				onclick={toggleAccountMenu}
+				class="lego-btn lego-btn-sm lego-neutral"
+			>
+				<svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+					<circle cx="10" cy="7" r="4" fill="currentColor" opacity="0.8"/>
+					<path d="M3 18 C3 14 6 12 10 12 C14 12 17 14 17 18" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.6"/>
+				</svg>
+			</button>
+
+			{#if accountMenuOpen}
+				<div bind:this={accountMenuEl} class="absolute top-[calc(100%+8px)] right-0 w-52 rounded-xl bg-[rgba(15,14,26,0.92)] backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-50 overflow-hidden">
+					{#if supportsPasskeys}
+						<button
+							onclick={handleSetupPasskey}
+							class="w-full px-4 py-2.5 text-left text-sm text-white/70 hover:bg-white/[0.06] transition flex items-center gap-2 cursor-pointer"
+						>
+							<svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+								<rect x="2" y="8" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+								<path d="M5 8 V5 A5 5 0 0 1 15 5 V8" stroke="currentColor" stroke-width="1.5" fill="none"/>
+								<circle cx="7" cy="12" r="1" fill="currentColor"/>
+							</svg>
+							Set up Passkey
+						</button>
+					{/if}
+
+					<button
+						onclick={handleOpenRecoveryCodes}
+						class="w-full px-4 py-2.5 text-left text-sm text-white/70 hover:bg-white/[0.06] transition flex items-center gap-2 cursor-pointer"
+					>
+						<svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+							<rect x="3" y="2" width="14" height="16" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
+							<line x1="6" y1="6" x2="14" y2="6" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+							<line x1="6" y1="9" x2="14" y2="9" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+							<line x1="6" y1="12" x2="11" y2="12" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+						</svg>
+						Recovery Codes
+					</button>
+
+					{#if passkeyStatus}
+						<p class="px-4 py-2 text-xs text-center {passkeyStatus.includes('!') ? 'text-emerald-400' : 'text-white/40'}">
+							{passkeyStatus}
+						</p>
+					{/if}
+
+					<div class="h-px bg-white/[0.06] mx-2"></div>
+
+					<button
+						onclick={handleSignOut}
+						disabled={isSigningOut}
+						class="w-full px-4 py-2.5 text-left text-sm text-red-400/70 hover:bg-red-500/[0.08] transition cursor-pointer disabled:opacity-50"
+					>
+						Sign out
+					</button>
+				</div>
+			{/if}
+		</div>
 	{:else}
 		<div class="w-px h-5 bg-white/10"></div>
 
@@ -352,3 +469,8 @@
 		<AuthDropdown initialMode="signup" onAuthSuccess={onAuthSuccess} />
 	{/if}
 </div>
+
+<!-- Recovery codes modal -->
+{#if showRecoveryModal}
+	<RecoveryCodesModal onClose={() => { showRecoveryModal = false; }} />
+{/if}

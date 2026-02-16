@@ -5,14 +5,37 @@ import { type DataModel } from "./_generated/dataModel";
 import { query } from "./_generated/server";
 import { betterAuth } from "better-auth/minimal";
 import { username } from "better-auth/plugins";
+import { passkey } from "@better-auth/passkey";
 import authConfig from "./auth.config";
-
-const siteUrl = process.env.SITE_URL!;
 
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
 /** Factory — creates a fresh Better Auth instance per request */
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
+	const siteUrl = process.env.SITE_URL;
+
+	// Build plugin list — passkey requires a valid URL (only available in Convex runtime, not Vite SSR)
+	const plugins: any[] = [
+		convex({ authConfig }),
+		username({
+			usernameValidator: (username) => {
+				// Allow letters, numbers, hyphens, underscores (3-30 chars)
+				return /^[a-zA-Z0-9_-]{3,30}$/.test(username);
+			},
+		}),
+	];
+
+	if (siteUrl) {
+		const url = new URL(siteUrl);
+		plugins.push(
+			passkey({
+				rpID: url.hostname,
+				rpName: "Orbyt",
+				origin: siteUrl,
+			}),
+		);
+	}
+
 	return betterAuth({
 		baseURL: siteUrl,
 		database: authComponent.adapter(ctx),
@@ -22,15 +45,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
 			minPasswordLength: 10,
 			maxPasswordLength: 64,
 		},
-		plugins: [
-			convex({ authConfig }),
-			username({
-				usernameValidator: (username) => {
-					// Allow letters, numbers, hyphens, underscores (3-30 chars)
-					return /^[a-zA-Z0-9_-]{3,30}$/.test(username);
-				},
-			}),
-		],
+		plugins,
 	});
 };
 
