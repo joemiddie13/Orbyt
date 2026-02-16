@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Rectangle, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
 import './gsapInit'; // Ensure GSAP + PixiPlugin registered before any object creation
 import { gsap } from './gsapInit';
+import { CURSOR_LABEL_STYLE } from './textStyles';
 import { PanZoom } from './interactions/PanZoom';
 import { StarField } from './StarField';
 import { TextBlock } from './objects/TextBlock';
@@ -84,8 +85,8 @@ export class CanvasRenderer {
 	/** Cache cursor colors by userId to avoid recomputing */
 	private cursorColorCache = new Map<string, number>();
 
-	/** Active stagger tweens — killed on canvas switch to prevent orphans (#9) */
-	private activeStaggerTweens: gsap.core.Tween[] = [];
+	/** Active stagger timeline — killed on canvas switch to prevent orphans */
+	private activeStaggerTl: gsap.core.Timeline | null = null;
 
 	/** Persistent container for grid/dot overlay — stays at correct z-position */
 	private overlayLayer!: Container;
@@ -113,6 +114,9 @@ export class CanvasRenderer {
 
 	/** Callback for when a music card's delete button is pressed */
 	onMusicDeleted?: (objectId: string) => void;
+
+	/** Callback for when a beacon's delete button is pressed */
+	onBeaconDeleted?: (objectId: string) => void;
 
 	/** Callback for long-press on any object (sticker picker) */
 	onObjectLongPress?: (objectId: string, screenX: number, screenY: number) => void;
@@ -168,19 +172,16 @@ export class CanvasRenderer {
 		const incomingIds = new Set(data.map((d) => d._id));
 		const isBulkLoad = animate && this.objects.size === 0 && data.length > 1;
 
-		// Kill any in-flight stagger tweens before reconciling (#9)
-		for (const tween of this.activeStaggerTweens) {
-			tween.kill();
+		// Kill any in-flight stagger timeline before reconciling
+		if (this.activeStaggerTl) {
+			this.activeStaggerTl.kill();
+			this.activeStaggerTl = null;
 		}
-		this.activeStaggerTweens = [];
 
 		// Remove objects that no longer exist in the database
 		for (const [id, obj] of this.objects) {
 			if (!incomingIds.has(id)) {
-				if (obj instanceof BeaconObject) obj.destroy();
-				if (obj instanceof TextBlock) obj.destroy();
-				if (obj instanceof PhotoObject) obj.destroy();
-				if (obj instanceof MusicObject) obj.destroy();
+				obj.destroy();
 				this.world.removeChild(obj.container);
 				obj.container.destroy({ children: true });
 				this.objects.delete(id);
@@ -252,6 +253,7 @@ export class CanvasRenderer {
 					onDragMove: (id, x, y) => this.onObjectDragging?.(id, x, y),
 					onTap: (id) => this.onBeaconTapped?.(id),
 					onLongPress: (id, sx, sy) => this.onObjectLongPress?.(id, sx, sy),
+					onDelete: (id) => this.onBeaconDeleted?.(id),
 				});
 				this.world.addChild(beacon.container);
 				this.objects.set(obj._id, beacon);
@@ -336,27 +338,22 @@ export class CanvasRenderer {
 			c.scale.set(0);
 			c.alpha = 0;
 		}
-		const scaleTween = gsap.to(containers.map((c) => c.scale), {
+		const tl = gsap.timeline({
+			onComplete: () => { if (this.activeStaggerTl === tl) this.activeStaggerTl = null; },
+		});
+		tl.to(containers.map((c) => c.scale), {
 			x: 1, y: 1,
 			duration: 0.45,
 			ease: 'back.out(1.4)',
 			stagger: 0.06,
-			onComplete: () => this.removeStaggerTween(scaleTween),
-		});
-		const alphaTween = gsap.to(containers, {
+		}, 0);
+		tl.to(containers, {
 			alpha: 1,
 			duration: 0.25,
 			ease: 'power2.out',
 			stagger: 0.06,
-			onComplete: () => this.removeStaggerTween(alphaTween),
-		});
-		this.activeStaggerTweens.push(scaleTween, alphaTween);
-	}
-
-	/** Remove a completed stagger tween from the active list */
-	private removeStaggerTween(tween: gsap.core.Tween) {
-		const idx = this.activeStaggerTweens.indexOf(tween);
-		if (idx !== -1) this.activeStaggerTweens.splice(idx, 1);
+		}, 0);
+		this.activeStaggerTl = tl;
 	}
 
 	/** Update beacon response dots */
@@ -530,13 +527,8 @@ export class CanvasRenderer {
 		arrow.stroke({ width: 1.5, color: 0xffffff });
 		container.addChild(arrow);
 
-		// Username label pill
-		const style = new TextStyle({
-			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
-			fontSize: 11,
-			fill: 0xffffff,
-		});
-		const label = new Text({ text: username, style });
+		// Username label pill (shared style — one instance across all cursors)
+		const label = new Text({ text: username, style: CURSOR_LABEL_STYLE });
 		label.x = 16;
 		label.y = 16;
 

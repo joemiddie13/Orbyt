@@ -98,6 +98,11 @@
 		() => activeCanvasId ? { canvasId: activeCanvasId as any } : 'skip'
 	);
 
+	// O(1) object lookup map — avoids repeated .find() scans in tap callbacks
+	const objectLookup = $derived.by(() =>
+		new Map(canvasObjects.data?.map((o: any) => [o._id, o]) ?? [])
+	);
+
 	// Query stickers for the active canvas
 	const canvasStickers = useQuery(
 		api.stickers.getByCanvas,
@@ -292,7 +297,7 @@
 
 		// Wire up beacon tap → detail panel
 		renderer.onBeaconTapped = (objectId) => {
-			const obj = canvasObjects.data?.find((o: any) => o._id === objectId);
+			const obj = objectLookup.get(objectId);
 			if (obj && obj.type === 'beacon') {
 				selectedBeacon = obj;
 			}
@@ -300,7 +305,7 @@
 
 		// Wire up note tap → inline editor (owner) or detail panel (non-owner)
 		renderer.onNoteTapped = async (objectId) => {
-			const obj = canvasObjects.data?.find((o: any) => o._id === objectId);
+			const obj = objectLookup.get(objectId);
 			if (!obj || obj.type !== 'textblock') return;
 
 			if (isCanvasOwner) {
@@ -366,7 +371,7 @@
 
 		// Wire up photo tap → detail panel
 		renderer.onPhotoTapped = (objectId) => {
-			const obj = canvasObjects.data?.find((o: any) => o._id === objectId);
+			const obj = objectLookup.get(objectId);
 			if (obj && obj.type === 'photo') {
 				selectedPhoto = obj;
 			}
@@ -379,7 +384,7 @@
 				stopMusicPlayback();
 				return;
 			}
-			const obj = canvasObjects.data?.find((o: any) => o._id === objectId);
+			const obj = objectLookup.get(objectId);
 			if (!obj || obj.type !== 'music') return;
 			const content = obj.content as { embedUrl: string; platform: string };
 			// Different card (or nothing playing) — start this one
@@ -394,6 +399,15 @@
 				await client.mutation(api.objects.remove, { id: objectId as any });
 			} catch (err) {
 				console.error('Failed to delete music:', err);
+			}
+		};
+
+		// Wire up beacon delete
+		renderer.onBeaconDeleted = async (objectId) => {
+			try {
+				await client.mutation(api.objects.remove, { id: objectId as any });
+			} catch (err) {
+				console.error('Failed to delete beacon:', err);
 			}
 		};
 

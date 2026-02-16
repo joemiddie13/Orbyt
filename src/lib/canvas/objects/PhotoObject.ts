@@ -1,5 +1,6 @@
 import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import { gsap } from '../gsapInit';
+import { FONT_FAMILY } from '../textStyles';
 import { makeDraggable, makeLongPressable, makeTappable, animateDragLift, animateDragDrop } from '../interactions/DragDrop';
 
 /**
@@ -194,7 +195,7 @@ export class PhotoObject {
 
 	private addCaption(text: string) {
 		const style = new TextStyle({
-			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+			fontFamily: FONT_FAMILY,
 			fontSize: 14,
 			fill: 0x333333,
 			wordWrap: true,

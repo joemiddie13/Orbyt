@@ -5,19 +5,19 @@ import { getAuthenticatedUser } from "./users";
 
 /** Check if two users are friends (accepted friendship in either direction) */
 export async function areFriends(ctx: QueryCtx | MutationCtx, uuidA: string, uuidB: string): Promise<boolean> {
-	const forward = await ctx.db
-		.query("friendships")
-		.withIndex("by_pair", (q) => q.eq("requesterId", uuidA).eq("receiverId", uuidB))
-		.filter((q) => q.eq(q.field("status"), "accepted"))
-		.first();
-	if (forward) return true;
-
-	const reverse = await ctx.db
-		.query("friendships")
-		.withIndex("by_pair", (q) => q.eq("requesterId", uuidB).eq("receiverId", uuidA))
-		.filter((q) => q.eq(q.field("status"), "accepted"))
-		.first();
-	return !!reverse;
+	const [forward, reverse] = await Promise.all([
+		ctx.db
+			.query("friendships")
+			.withIndex("by_pair", (q) => q.eq("requesterId", uuidA).eq("receiverId", uuidB))
+			.filter((q) => q.eq(q.field("status"), "accepted"))
+			.first(),
+		ctx.db
+			.query("friendships")
+			.withIndex("by_pair", (q) => q.eq("requesterId", uuidB).eq("receiverId", uuidA))
+			.filter((q) => q.eq(q.field("status"), "accepted"))
+			.first(),
+	]);
+	return !!(forward || reverse);
 }
 
 /** Send a friend request by entering someone's friend code */

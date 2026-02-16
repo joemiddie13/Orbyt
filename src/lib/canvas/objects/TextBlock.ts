@@ -1,5 +1,6 @@
 import { Container, Graphics, HTMLText, HTMLTextStyle, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
 import { gsap } from '../gsapInit';
+import { FONT_FAMILY } from '../textStyles';
 import { makeDraggable, makeLongPressable, makeTappable, animateDragLift, animateDragDrop } from '../interactions/DragDrop';
 
 /**
@@ -82,6 +83,8 @@ export class TextBlock {
 	private style: HTMLTextStyle;
 	/** Active color transition tween (killed before starting a new one) */
 	private colorTween: gsap.core.Tween | null = null;
+	/** Pending RAF ID for height check — cancelled on destroy to prevent callbacks on dead containers */
+	private pendingRAF: number | null = null;
 
 	/** User-set minimum height (0 = auto-fit to text only) */
 	private userHeight = 0;
@@ -112,7 +115,7 @@ export class TextBlock {
 
 		// HTMLTextStyle with tagStyles for rich text rendering
 		this.style = new HTMLTextStyle({
-			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+			fontFamily: FONT_FAMILY,
 			fontSize: 16,
 			fill: 0x2d2d2d,
 			wordWrap: true,
@@ -144,7 +147,7 @@ export class TextBlock {
 			this.titleDisplay = new Text({
 				text: title,
 				style: new TextStyle({
-					fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+					fontFamily: FONT_FAMILY,
 					fontSize: 18,
 					fontWeight: 'bold',
 					fill: 0x2d2d2d,
@@ -230,10 +233,8 @@ export class TextBlock {
 	updateText(newText: string) {
 		if (this.textDisplay.text === newText) return;
 		this.textDisplay.text = newText;
-		this.recalcBlockHeight();
-		this.background.clear();
-		this.drawBackground(this.currentColor);
-		this.updateResizeZones();
+		// Skip immediate redraw — scheduleHeightCheck() will recalc + redraw
+		// over the next few frames as HTMLText measures asynchronously
 		this.scheduleHeightCheck();
 	}
 
@@ -274,7 +275,7 @@ export class TextBlock {
 				this.titleDisplay = new Text({
 					text: title,
 					style: new TextStyle({
-						fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+						fontFamily: FONT_FAMILY,
 						fontSize: 18,
 						fontWeight: 'bold',
 						fill: 0x2d2d2d,
@@ -336,18 +337,25 @@ export class TextBlock {
 	/**
 	 * HTMLText measures asynchronously (offscreen SVG foreignObject).
 	 * Re-check height over several frames until the measurement settles.
+	 * RAF ID is tracked so we can cancel on destroy (prevents callbacks on dead containers).
 	 */
 	private scheduleHeightCheck() {
+		// Cancel any in-flight check before starting a new one
+		if (this.pendingRAF !== null) {
+			cancelAnimationFrame(this.pendingRAF);
+			this.pendingRAF = null;
+		}
 		let remaining = 5;
 		let lastHeight = -1;
 		const check = () => {
+			this.pendingRAF = null;
 			if (!this.container.parent) return; // destroyed
 			const titleHeight = this.titleDisplay ? this.titleDisplay.height + TextBlock.TITLE_GAP : 0;
 			// Reposition body text below title (title may have re-measured after word wrap)
 			this.textDisplay.y = PADDING + titleHeight;
 			const textFitHeight = this.textDisplay.height + titleHeight + PADDING * 2;
 			const needed = Math.max(MIN_HEIGHT, textFitHeight, this.userHeight);
-			if (needed > this.blockHeight + 1) {
+			if (Math.abs(needed - this.blockHeight) > 1) {
 				this.blockHeight = needed;
 				this.background.clear();
 				this.drawBackground(this.currentColor);
@@ -355,11 +363,19 @@ export class TextBlock {
 			}
 			remaining--;
 			// Exit early if height stabilized (same as last frame)
-			if (needed === lastHeight) return;
+			if (needed === lastHeight) {
+				// Final sync — ensure background matches even if height didn't change
+				this.background.clear();
+				this.drawBackground(this.currentColor);
+				this.updateResizeZones();
+				return;
+			}
 			lastHeight = needed;
-			if (remaining > 0) requestAnimationFrame(check);
+			if (remaining > 0) {
+				this.pendingRAF = requestAnimationFrame(check);
+			}
 		};
-		requestAnimationFrame(check);
+		this.pendingRAF = requestAnimationFrame(check);
 	}
 
 	private drawBackground(color: number) {
@@ -587,8 +603,12 @@ export class TextBlock {
 		gsap.to(this.container, { alpha: 1, duration: 0.2, ease: 'power2.out' });
 	}
 
-	/** Kill all running GSAP tweens on this object — call before removal (#10) */
+	/** Kill all running GSAP tweens and pending RAF on this object — call before removal */
 	destroy() {
+		if (this.pendingRAF !== null) {
+			cancelAnimationFrame(this.pendingRAF);
+			this.pendingRAF = null;
+		}
 		if (this.colorTween) {
 			this.colorTween.kill();
 			this.colorTween = null;

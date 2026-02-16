@@ -1,5 +1,6 @@
 import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import { gsap } from '../gsapInit';
+import { FONT_FAMILY } from '../textStyles';
 import { makeDraggable, makeLongPressable, makeTappable } from '../interactions/DragDrop';
 
 /**
@@ -174,7 +175,7 @@ export class MusicObject {
 
 		// ── Title ──────────────────────────────────────────────────────
 		const titleStyle = new TextStyle({
-			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+			fontFamily: FONT_FAMILY,
 			fontSize: 18,
 			fontWeight: 'bold',
 			fill: 0xffffff,
@@ -188,7 +189,7 @@ export class MusicObject {
 
 		// ── Artist ─────────────────────────────────────────────────────
 		const artistStyle = new TextStyle({
-			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+			fontFamily: FONT_FAMILY,
 			fontSize: 14,
 			fill: 0xffffff,
 			wordWrap: true,
@@ -209,7 +210,7 @@ export class MusicObject {
 			};
 			const platformLabel = PLATFORM_LABELS[content.platform] ?? content.platform;
 			const platformStyle = new TextStyle({
-				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+				fontFamily: FONT_FAMILY,
 				fontSize: 12,
 				fill: this.platformColor,
 			});
@@ -311,6 +312,10 @@ export class MusicObject {
 
 			gsap.fromTo(this.glowBg, { alpha: 0 }, { alpha: 1, duration: 0.3, ease: 'power2.out' });
 
+			// Kill any existing EQ tweens first to prevent orphaned infinite-repeat tweens
+			for (const bar of this.eqBars) {
+				gsap.killTweensOf(bar.scale);
+			}
 			for (let i = 0; i < this.eqBars.length; i++) {
 				gsap.to(this.eqBars[i].scale, {
 					y: 'random(0.2, 1.0)',

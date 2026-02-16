@@ -1,5 +1,6 @@
 import { Container, Graphics, Rectangle, Sprite, Text, Texture, TextStyle } from 'pixi.js';
 import { gsap } from '../gsapInit';
+import { FONT_FAMILY } from '../textStyles';
 import { makeDraggable, makeLongPressable, makeTappable } from '../interactions/DragDrop';
 
 /**
@@ -68,6 +69,7 @@ export interface BeaconObjectOptions {
 	onDragMove?: (objectId: string, x: number, y: number) => void;
 	onTap?: (objectId: string) => void;
 	onLongPress?: (objectId: string, screenX: number, screenY: number) => void;
+	onDelete?: (objectId: string) => void;
 	isExpired?: boolean;
 	isDirect?: boolean;
 }
@@ -214,7 +216,7 @@ export class BeaconObject {
 
 		// --- Layer 7: Text content ---
 		const titleStyle = new TextStyle({
-			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+			fontFamily: FONT_FAMILY,
 			fontSize: 22,
 			fontWeight: 'bold',
 			fill: 0xffffff,
@@ -238,7 +240,7 @@ export class BeaconObject {
 		// Time display
 		const timeStr = this.formatTimeRange(content.startTime, content.endTime);
 		const timeStyle = new TextStyle({
-			fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+			fontFamily: FONT_FAMILY,
 			fontSize: 16,
 			fill: 0xffffff,
 			wordWrap: true,
@@ -253,7 +255,7 @@ export class BeaconObject {
 		// "From [username]" for direct beacons — above bottom info
 		if (isDirect && content.fromUsername) {
 			const fromStyle = new TextStyle({
-				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+				fontFamily: FONT_FAMILY,
 				fontSize: 15,
 				fill: 0xffffff,
 			});
@@ -267,7 +269,7 @@ export class BeaconObject {
 		// Location — pinned to bottom of card
 		if (content.locationAddress) {
 			const locStyle = new TextStyle({
-				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+				fontFamily: FONT_FAMILY,
 				fontSize: 15,
 				fill: 0xffffff,
 				wordWrap: true,
@@ -284,7 +286,7 @@ export class BeaconObject {
 		if (this.isExpired) {
 			this.container.alpha = 0.3;
 			const expStyle = new TextStyle({
-				fontFamily: "'Satoshi', system-ui, -apple-system, sans-serif",
+				fontFamily: FONT_FAMILY,
 				fontSize: 15,
 				fontWeight: 'bold',
 				fill: 0xffffff,
@@ -293,6 +295,49 @@ export class BeaconObject {
 			expText.x = BEACON_WIDTH / 2 - expText.width / 2;
 			expText.y = this.cardHeight / 2 - 8;
 			this.container.addChild(expText);
+		}
+
+		// --- Delete button (trash icon, top-right corner, owner only) ---
+		if (options.editable !== false && options.onDelete) {
+			const delBtn = new Container();
+			delBtn.eventMode = 'static';
+			delBtn.cursor = 'pointer';
+
+			const cx = BEACON_WIDTH - 14;
+			const cy = this.cardHeight - 14;
+
+			const delBg = new Graphics();
+			delBg.circle(cx, cy, 12);
+			delBg.fill({ color: 0x000000, alpha: 0.5 });
+			delBtn.addChild(delBg);
+
+			const trash = new Graphics();
+			// Lid
+			trash.roundRect(cx - 6, cy - 6, 12, 2, 1);
+			trash.fill(0xffffff);
+			// Lid handle
+			trash.roundRect(cx - 3, cy - 8, 6, 2.5, 1);
+			trash.fill(0xffffff);
+			// Body
+			trash.moveTo(cx - 5, cy - 3);
+			trash.lineTo(cx - 4, cy + 6);
+			trash.lineTo(cx + 4, cy + 6);
+			trash.lineTo(cx + 5, cy - 3);
+			trash.closePath();
+			trash.fill(0xffffff);
+			// Body lines
+			trash.rect(cx - 2, cy - 1, 1, 5);
+			trash.fill(0x000000);
+			trash.rect(cx + 1, cy - 1, 1, 5);
+			trash.fill(0x000000);
+			delBtn.addChild(trash);
+
+			delBtn.on('pointerdown', (e) => { e.stopPropagation(); });
+			delBtn.on('pointerup', (e) => {
+				e.stopPropagation();
+				if (this.objectId) options.onDelete!(this.objectId);
+			});
+			this.container.addChild(delBtn);
 		}
 
 		// --- Interactions ---
@@ -617,14 +662,21 @@ export class BeaconObject {
 
 	/** Response dots — small colored circles indicating people */
 	updateResponseDots(responses: Array<{ status: string }>) {
-		if (this.responseDots) {
-			this.container.removeChild(this.responseDots);
-			this.responseDots.destroy();
+		if (responses.length === 0) {
+			if (this.responseDots) {
+				this.responseDots.clear();
+				this.responseDots.visible = false;
+			}
+			return;
 		}
 
-		if (responses.length === 0) return;
+		if (!this.responseDots) {
+			this.responseDots = new Graphics();
+			this.container.addChild(this.responseDots);
+		}
 
-		this.responseDots = new Graphics();
+		this.responseDots.clear();
+		this.responseDots.visible = true;
 		const dotSize = 5;
 		const gap = 3;
 		let xPos = BEACON_WIDTH - BEACON_PADDING;
@@ -637,8 +689,6 @@ export class BeaconObject {
 			this.responseDots.circle(xPos + dotSize, BEACON_PADDING + 4, dotSize);
 			this.responseDots.fill(color);
 		}
-
-		this.container.addChild(this.responseDots);
 	}
 
 	private calculateHeight(content: { title: string; startTime: number; endTime: number; locationAddress?: string; visibilityType: string; fromUsername?: string }): number {
