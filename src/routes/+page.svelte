@@ -7,9 +7,6 @@
 	import { PeerManager } from '$lib/webrtc';
 	import AuthModal from '$lib/components/AuthModal.svelte';
 	import CanvasToolbar from '$lib/components/CanvasToolbar.svelte';
-	import FriendCodeModal from '$lib/components/FriendCodeModal.svelte';
-	import FriendsList from '$lib/components/FriendsList.svelte';
-	import CanvasSwitcher from '$lib/components/CanvasSwitcher.svelte';
 	import CreateCanvasModal from '$lib/components/CreateCanvasModal.svelte';
 	import CreateBeaconModal from '$lib/components/CreateBeaconModal.svelte';
 	import BeaconDetailPanel from '$lib/components/BeaconDetailPanel.svelte';
@@ -49,9 +46,6 @@
 	});
 
 	// Modal state
-	let showFriendCode = $state(false);
-	let showFriendsList = $state(false);
-	let showCanvasSwitcher = $state(false);
 	let showCreateCanvas = $state(false);
 	let showCreateBeacon = $state(false);
 	let selectedBeacon = $state<any>(null);
@@ -427,9 +421,6 @@
 		if (selectedBeacon) { selectedBeacon = null; return; }
 		if (selectedNote) { selectedNote = null; return; }
 		if (stickerPickerState) { stickerPickerState = null; return; }
-		if (showFriendCode) { showFriendCode = false; return; }
-		if (showFriendsList) { showFriendsList = false; return; }
-		if (showCanvasSwitcher) { showCanvasSwitcher = false; return; }
 		if (playingMusicId) { stopMusicPlayback(); return; }
 	}
 
@@ -559,7 +550,6 @@
 		stopMusicPlayback();
 		activeCanvasId = canvasId;
 		activeCanvasName = name;
-		showCanvasSwitcher = false;
 	}
 
 	/** Handle new shared canvas creation */
@@ -829,9 +819,11 @@
 		onCreateBeacon={() => { showCreateBeacon = true; }}
 		onAddPhoto={addPhoto}
 		onAddMusic={() => { showAddMusic = true; }}
-		onFriends={() => { showFriendCode = true; }}
-		onFriendsList={() => { showFriendsList = true; }}
-		onCanvasSwitcher={() => { showCanvasSwitcher = !showCanvasSwitcher; }}
+		friendCode={currentUser.user?.friendCode ?? ''}
+		activeCanvasId={activeCanvasId}
+		canvases={accessibleCanvases.data}
+		onSelectCanvas={switchCanvas}
+		onCreateCanvas={() => { showCreateCanvas = true; }}
 		{webrtcConnected}
 	/>
 {/if}
@@ -852,27 +844,6 @@
 {/if}
 
 <!-- Modals -->
-{#if showFriendCode && currentUser.user}
-	<FriendCodeModal
-		friendCode={currentUser.user.friendCode ?? ''}
-		onClose={() => { showFriendCode = false; }}
-	/>
-{/if}
-
-{#if showFriendsList}
-	<FriendsList onClose={() => { showFriendsList = false; }} />
-{/if}
-
-{#if showCanvasSwitcher}
-	<CanvasSwitcher
-		activeCanvasId={activeCanvasId}
-		canvases={accessibleCanvases.data}
-		onSelect={switchCanvas}
-		onCreateNew={() => { showCanvasSwitcher = false; showCreateCanvas = true; }}
-		onClose={() => { showCanvasSwitcher = false; }}
-	/>
-{/if}
-
 {#if showCreateCanvas}
 	<CreateCanvasModal
 		onCreated={onCanvasCreated}
