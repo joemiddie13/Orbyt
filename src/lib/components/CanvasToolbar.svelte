@@ -23,6 +23,8 @@
 		webrtcConnected = false,
 		showAccount = true,
 		onAuthSuccess = undefined,
+		hasFriendBeacons = false,
+		activeBeaconCanvasIds = [],
 	}: {
 		username: string;
 		canvasName?: string;
@@ -41,9 +43,49 @@
 		showAccount?: boolean;
 		/** Auth success callback (landing page dropdowns) */
 		onAuthSuccess?: () => void;
+		/** Whether any friend has an active beacon */
+		hasFriendBeacons?: boolean;
+		/** Canvas IDs that have active friend beacons */
+		activeBeaconCanvasIds?: string[];
 	} = $props();
 
 	let isSigningOut = $state(false);
+
+	// Beacon button ref for funky color cycling
+	let beaconBtn: HTMLButtonElement = $state(undefined!);
+	let beaconGlowTimeline: gsap.core.Timeline | null = null;
+
+	// Funky rapid color cycle when friends have active beacons
+	const FUNKY_COLORS = [
+		'#FF6B6B', '#FECA57', '#48DBFB', '#FF9FF3',
+		'#54A0FF', '#5F27CD', '#01A3A4', '#F368E0',
+		'#FF6348', '#7BED9F', '#E056FD', '#FFC312',
+	];
+
+	$effect(() => {
+		if (hasFriendBeacons && beaconBtn) {
+			if (!beaconGlowTimeline) {
+				const tl = gsap.timeline({ repeat: -1 });
+				FUNKY_COLORS.forEach((color, i) => {
+					tl.to(beaconBtn, {
+						boxShadow: `0 0 14px 4px ${color}88, inset 0 0 8px ${color}44`,
+						background: `${color}30`,
+						duration: 0.25,
+						ease: 'power1.inOut',
+					});
+				});
+				beaconGlowTimeline = tl;
+			}
+		} else {
+			if (beaconGlowTimeline) {
+				beaconGlowTimeline.kill();
+				beaconGlowTimeline = null;
+				if (beaconBtn) {
+					gsap.set(beaconBtn, { boxShadow: 'none', background: 'transparent', clearProps: 'boxShadow,background' });
+				}
+			}
+		}
+	});
 
 	// SVG element refs for GSAP animations
 	let noteSparkle: SVGElement = $state(undefined!);
@@ -116,6 +158,8 @@
 	onDestroy(() => {
 		idleTweens.forEach((t) => t.kill());
 		idleTweens = [];
+		beaconGlowTimeline?.kill();
+		beaconGlowTimeline = null;
 	});
 
 	function noteEnter() {
@@ -179,6 +223,7 @@
 		canvasName={canvasName ?? 'My Canvas'}
 		onSelect={onSelectCanvas}
 		onCreateNew={onCreateCanvas}
+		{activeBeaconCanvasIds}
 	/>
 
 	<div class="w-px h-5 bg-white/10"></div>
@@ -208,9 +253,11 @@
 
 		<!-- Beacon button — signal broadcast -->
 		<button
+			bind:this={beaconBtn}
 			onclick={onCreateBeacon}
 			onmouseenter={beaconEnter}
 			class="lego-btn lego-orange flex items-center gap-1.5"
+			style="border-radius: 8px;"
 		>
 			<svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
 				<!-- Center dot -->

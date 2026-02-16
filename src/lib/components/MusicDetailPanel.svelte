@@ -259,7 +259,7 @@
 			<div bind:this={header} class="flex items-center justify-between">
 				<div class="flex items-center gap-2">
 					<span class="inline-block w-2.5 h-2.5 rounded-full" style="background: {config.color};"></span>
-					<span class="text-xs font-medium uppercase tracking-wider" style="font-family: 'Satoshi', sans-serif; color: {config.color}; text-shadow: 0 0 8px rgba({config.rgb}, 0.3);">{config.label}</span>
+					<span class="text-xs font-medium uppercase tracking-wider" style="font-family: 'Geist Mono', monospace; color: {config.color}; text-shadow: 0 0 8px rgba({config.rgb}, 0.3);">{config.label}</span>
 				</div>
 				<button
 					onclick={handleClose}
@@ -294,9 +294,9 @@
 
 			<!-- Title + Artist -->
 			<div>
-				<h3 class="text-base font-semibold text-white" style="font-family: 'Satoshi', sans-serif;">{music.content.title}</h3>
+				<h3 class="text-base font-semibold text-white" style="font-family: 'Geist Mono', monospace;">{music.content.title}</h3>
 				{#if music.content.artist}
-					<p class="text-sm text-white/60 mt-0.5" style="font-family: 'Satoshi', sans-serif;">{music.content.artist}</p>
+					<p class="text-sm text-white/60 mt-0.5" style="font-family: 'Geist Mono', monospace;">{music.content.artist}</p>
 				{/if}
 			</div>
 

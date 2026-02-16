@@ -1,7 +1,7 @@
 import { Container, Graphics, HTMLText, HTMLTextStyle, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
 import { gsap } from '../gsapInit';
 import { FONT_FAMILY } from '../textStyles';
-import { makeDraggable, makeLongPressable, makeTappable, animateDragLift, animateDragDrop } from '../interactions/DragDrop';
+import { makeDraggable, makeLongPressable, makeTappable, makeHoverable, animateDragLift, animateDragDrop } from '../interactions/DragDrop';
 
 /**
  * TextBlock — a sticky-note-style object on the canvas.
@@ -85,6 +85,7 @@ export class TextBlock {
 	private colorTween: gsap.core.Tween | null = null;
 	/** Pending RAF ID for height check — cancelled on destroy to prevent callbacks on dead containers */
 	private pendingRAF: number | null = null;
+	private cleanupHover: (() => void) | null = null;
 
 	/** User-set minimum height (0 = auto-fit to text only) */
 	private userHeight = 0;
@@ -114,6 +115,8 @@ export class TextBlock {
 		this.container.cursor = (options.editable !== false) ? 'grab' : 'default';
 
 		// HTMLTextStyle with tagStyles for rich text rendering
+		// padding: 20 gives HTMLText's offscreen SVG foreignObject extra rendering
+		// buffer — prevents bottom-line cutoff on lists and multi-line content
 		this.style = new HTMLTextStyle({
 			fontFamily: FONT_FAMILY,
 			fontSize: 26,
@@ -121,7 +124,7 @@ export class TextBlock {
 			wordWrap: true,
 			wordWrapWidth: this.blockWidth - PADDING * 2,
 			lineHeight: 36,
-			padding: 4,
+			padding: 20,
 			tagStyles: {
 				h1: { fontSize: 38, fontWeight: 'bold' },
 				h2: { fontSize: 30, fontWeight: 'bold' },
@@ -221,6 +224,9 @@ export class TextBlock {
 
 		// HTMLText measures async — re-check height once layout settles
 		this.scheduleHeightCheck();
+
+		// Hover expand
+		this.cleanupHover = makeHoverable(this.container);
 
 		// Pop-in animation — note materializes with alpha + scale
 		if (options.animate !== false) {
@@ -347,7 +353,7 @@ export class TextBlock {
 			cancelAnimationFrame(this.pendingRAF);
 			this.pendingRAF = null;
 		}
-		let remaining = 12;
+		let remaining = 20;
 		let lastHeight = -1;
 		let settled = 0; // consecutive frames with identical height
 		const check = () => {
@@ -386,7 +392,7 @@ export class TextBlock {
 		this.pendingRAF = requestAnimationFrame(check);
 
 		// Safety net: HTMLText can be slow with complex content (lists, headings).
-		// Run a final measurement after 500ms regardless of RAF outcome.
+		// Run a final measurement after 800ms regardless of RAF outcome.
 		setTimeout(() => {
 			if (!this.container.parent) return;
 			const titleHeight = this.titleDisplay ? this.titleDisplay.height + TextBlock.TITLE_GAP : 0;
@@ -399,7 +405,7 @@ export class TextBlock {
 				this.drawBackground(this.currentColor);
 				this.updateResizeZones();
 			}
-		}, 500);
+		}, 800);
 	}
 
 	private drawBackground(color: number) {
@@ -637,6 +643,7 @@ export class TextBlock {
 			this.colorTween.kill();
 			this.colorTween = null;
 		}
+		this.cleanupHover?.();
 		gsap.killTweensOf(this.container);
 		gsap.killTweensOf(this.container.scale);
 	}

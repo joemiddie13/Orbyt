@@ -1,5 +1,20 @@
-@import url('https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap');
+@import url('https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-mono/style.min.css');
 @import "tailwindcss";
+
+/* Custom cursors — Orbyt amber-outlined */
+html, body, * {
+	cursor: url('/cursor-default.svg') 2 1, default;
+}
+a, button, [role="button"], input[type="submit"], input[type="button"],
+select, summary, [onclick], [tabindex]:not([tabindex="-1"]) {
+	cursor: url('/cursor-pointer.svg') 10 10, pointer !important;
+}
+input, textarea, [contenteditable="true"] {
+	cursor: text !important;
+}
+canvas {
+	cursor: url('/cursor-default.svg') 2 1, default;
+}
 
 /* Reset everything to zero — the canvas IS the app */
 html, body {
@@ -8,7 +23,7 @@ html, body {
 	width: 100%;
 	height: 100%;
 	overflow: hidden;
-	font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
+	font-family: 'Geist Mono', system-ui, -apple-system, sans-serif;
 }
 
 /* Glassmorphism — "Cozy Campfire in Space" design system */
@@ -54,7 +69,7 @@ html, body {
 	border-radius: 6px;
 	font-weight: 600;
 	font-size: 0.875rem;
-	font-family: 'Satoshi', system-ui, sans-serif;
+	font-family: 'Geist Mono', system-ui, sans-serif;
 	border: none;
 	cursor: pointer;
 	transform: translateY(0);
@@ -263,7 +278,7 @@ html, body {
 	border-radius: 4px;
 	font-size: 0.8rem;
 	font-weight: 500;
-	font-family: 'Satoshi', system-ui, sans-serif;
+	font-family: 'Geist Mono', system-ui, sans-serif;
 	transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 

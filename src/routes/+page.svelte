@@ -22,8 +22,9 @@
 	let canvasContainer: HTMLDivElement;
 	let renderer: CanvasRenderer;
 	let authSettled = $state(false);
-	let landingMode = $state(true);
+	let landingMode = $state(false);
 	let landingTransitionRunning = $state(false);
+	let landingInitialized = false;
 
 	const client = useConvexClient();
 	const currentUser = useCurrentUser();
@@ -57,6 +58,7 @@
 	let showAddMusic = $state(false);
 	let playingMusicId = $state<string | null>(null);
 	let overlayMode = $state<'none' | 'dots' | 'lines'>('none');
+	let dragOver = $state(false);
 	let audioIframe: HTMLIFrameElement | null = null;
 	let morphWrapper: HTMLDivElement | null = null;
 
@@ -117,6 +119,12 @@
 		() => currentUser.isAuthenticated ? {} : 'skip'
 	);
 
+	// Friend beacon activity — warm awareness (no badge counts, just presence)
+	const friendBeaconActivity = useQuery(
+		api.beacons.getFriendBeaconActivity,
+		() => currentUser.isAuthenticated ? {} : 'skip'
+	);
+
 	// Presence: who's viewing this canvas
 	const canvasViewers = useQuery(
 		api.presence.getViewers,
@@ -151,6 +159,28 @@
 		landingTransitionRunning = false;
 		// Existing effects will kick in to load the user's personal canvas
 	}
+
+	// Logout → re-enter landing mode (clear canvas objects, show landing page)
+	let wasAuthenticated = false;
+	$effect(() => {
+		if (currentUser.isAuthenticated) {
+			wasAuthenticated = true;
+		} else if (wasAuthenticated && !currentUser.isAuthenticated && renderer && !landingMode) {
+			// User just logged out — reset to landing page
+			wasAuthenticated = false;
+			activeCanvasId = null;
+			activeCanvasName = 'My Canvas';
+			renderer.syncObjects([], false);
+			renderer.enterLandingMode();
+			landingMode = true;
+			landingInitialized = true;
+			overlayMode = 'dots';
+			// Clean up WebRTC
+			peerManager?.destroy();
+			peerManager = null;
+			webrtcConnected = false;
+		}
+	});
 
 	// Recovery: if auth exists but Astrophage user record is missing, create it
 	$effect(() => {
@@ -285,17 +315,36 @@
 	});
 
 	onMount(async () => {
-		setTimeout(() => { authSettled = true; }, 800);
-
 		renderer = new CanvasRenderer();
 		await renderer.init(canvasContainer);
 
-		// If not already authenticated, enter landing mode
-		if (!currentUser.isAuthenticated) {
+		// Wait for auth token to propagate before deciding landing vs canvas.
+		// If already authenticated (token arrived fast), skip landing immediately.
+		// Otherwise wait up to 800ms — if still unauthenticated, show landing page.
+		if (currentUser.isAuthenticated) {
+			authSettled = true;
+		} else {
+			await new Promise<void>((resolve) => {
+				const checkInterval = setInterval(() => {
+					if (currentUser.isAuthenticated) {
+						clearInterval(checkInterval);
+						resolve();
+					}
+				}, 50);
+				setTimeout(() => {
+					clearInterval(checkInterval);
+					resolve();
+				}, 800);
+			});
+			authSettled = true;
+		}
+
+		// Now decide: landing page or straight to canvas
+		if (!currentUser.isAuthenticated && !landingInitialized) {
+			landingInitialized = true;
+			landingMode = true;
 			renderer.enterLandingMode();
 			overlayMode = 'dots';
-		} else {
-			landingMode = false;
 		}
 
 		// Wire up drag-start → WebRTC broadcast (lift animation on remote)
@@ -446,9 +495,36 @@
 			peerManager.sendCursor(world.x, world.y);
 		});
 
+		// Drag-and-drop photos from Finder/Desktop
+		canvasContainer.addEventListener('dragover', handleDragOver);
+		canvasContainer.addEventListener('dragleave', handleDragLeave);
+		canvasContainer.addEventListener('drop', handleDrop);
+
 		// Global Escape key → close topmost modal/menu
 		window.addEventListener('keydown', handleEscape);
 	});
+
+	function handleDragOver(e: DragEvent) {
+		// Only react to file drags (not internal PixiJS drags)
+		if (!e.dataTransfer?.types.includes('Files')) return;
+		e.preventDefault();
+		dragOver = true;
+	}
+
+	function handleDragLeave(e: DragEvent) {
+		// Only trigger when actually leaving the container, not entering children
+		const related = e.relatedTarget as Node | null;
+		if (related && canvasContainer.contains(related)) return;
+		dragOver = false;
+	}
+
+	function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		dragOver = false;
+		const files = e.dataTransfer?.files;
+		if (!files || files.length === 0) return;
+		handleFileDrop(files, e.clientX, e.clientY);
+	}
 
 	function handleEscape(e: KeyboardEvent) {
 		if (e.key !== 'Escape') return;
@@ -466,6 +542,11 @@
 
 	onDestroy(() => {
 		if (typeof window !== 'undefined') window.removeEventListener('keydown', handleEscape);
+		if (canvasContainer) {
+			canvasContainer.removeEventListener('dragover', handleDragOver);
+			canvasContainer.removeEventListener('dragleave', handleDragLeave);
+			canvasContainer.removeEventListener('drop', handleDrop);
+		}
 		stopMusicPlayback();
 		peerManager?.destroy();
 		peerManager = null;
@@ -570,6 +651,57 @@
 
 		document.body.appendChild(input);
 		input.click();
+	}
+
+	/** Handle files dropped onto the canvas from Finder/Desktop */
+	async function handleFileDrop(files: FileList, screenX: number, screenY: number) {
+		if (!activeCanvasId || !currentUser.user) return;
+
+		const VALID_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+		const MAX_SIZE = 5 * 1024 * 1024;
+
+		const validFiles = Array.from(files).filter((f) => {
+			if (!VALID_TYPES.includes(f.type)) {
+				console.warn(`Skipped "${f.name}" — unsupported type: ${f.type}`);
+				return false;
+			}
+			if (f.size > MAX_SIZE) {
+				console.warn(`Skipped "${f.name}" — exceeds 5MB limit (${(f.size / 1024 / 1024).toFixed(1)}MB)`);
+				return false;
+			}
+			return true;
+		});
+
+		if (validFiles.length === 0) return;
+
+		const worldDrop = renderer.screenToWorld(screenX, screenY);
+
+		for (let i = 0; i < validFiles.length; i++) {
+			const file = validFiles[i];
+			// Offset each subsequent photo so they fan out instead of stacking
+			const offsetX = i * 30;
+			const offsetY = i * 30;
+			const x = Math.max(0, Math.min(3000 - 260, Math.round(worldDrop.x - 130 + offsetX)));
+			const y = Math.max(0, Math.min(2000 - 300, Math.round(worldDrop.y - 150 + offsetY)));
+
+			try {
+				const uploadUrl = await client.mutation(api.photos.generateUploadUrl, {});
+				const result = await fetch(uploadUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': file.type },
+					body: file,
+				});
+				const { storageId } = await result.json();
+
+				await client.mutation(api.photos.createPhoto, {
+					canvasId: activeCanvasId as any,
+					storageId,
+					position: { x, y },
+				});
+			} catch (err) {
+				console.error(`Photo upload failed for "${file.name}":`, err);
+			}
+		}
 	}
 
 	/** Change the canvas overlay mode */
@@ -846,6 +978,15 @@
 
 <div bind:this={canvasContainer} class="w-screen h-screen overflow-hidden"></div>
 
+{#if dragOver}
+	<div class="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+		<div class="absolute inset-4 border-2 border-dashed border-white/40 rounded-2xl"></div>
+		<div class="bg-black/40 backdrop-blur-sm px-6 py-3 rounded-xl">
+			<p class="text-white/80 text-lg font-medium">Drop photos here</p>
+		</div>
+	</div>
+{/if}
+
 <!-- Auth forms now live in toolbar dropdowns (AuthDropdown.svelte) -->
 
 {#if currentUser.isAuthenticated}
@@ -863,6 +1004,8 @@
 		onSelectCanvas={switchCanvas}
 		onCreateCanvas={() => { showCreateCanvas = true; }}
 		{webrtcConnected}
+		hasFriendBeacons={friendBeaconActivity.data?.hasFriendBeacons ?? false}
+		activeBeaconCanvasIds={friendBeaconActivity.data?.activeCanvasIds ?? []}
 	/>
 {:else if landingMode}
 	<CanvasToolbar

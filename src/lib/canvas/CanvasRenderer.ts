@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, Rectangle, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
 import './gsapInit'; // Ensure GSAP + PixiPlugin registered before any object creation
 import { gsap } from './gsapInit';
-import { CURSOR_LABEL_STYLE } from './textStyles';
+import { CURSOR_LABEL_STYLE, CURSOR_POINTER } from './textStyles';
 import { PanZoom } from './interactions/PanZoom';
 import { StarField } from './StarField';
 import { TextBlock } from './objects/TextBlock';
@@ -771,7 +771,7 @@ export class CanvasRenderer {
 
 		const btn = new Container();
 		btn.eventMode = 'static';
-		btn.cursor = 'pointer';
+		btn.cursor = CURSOR_POINTER;
 		btn.hitArea = TRIGGER_HIT;
 
 		// Position at top-right corner of object
@@ -818,7 +818,7 @@ export class CanvasRenderer {
 			const sticker = STICKERS[i];
 			const opt = new Container();
 			opt.eventMode = 'static';
-			opt.cursor = 'pointer';
+			opt.cursor = CURSOR_POINTER;
 			// Start at trigger position (x=0), will animate to final position
 			opt.x = 0;
 			opt.y = 0;
@@ -1004,27 +1004,27 @@ export class CanvasRenderer {
 
 		add(new TextBlock(
 			'<p>No feeds. No algorithms. Just a canvas for your people.</p>',
-			120, 120, 0xfff9c4, noteOpts(380), '\u2728 Welcome to Orbyt',
+			120, 120, 0xfff9c4, noteOpts(440), '\u2728 Welcome to Orbyt',
 		).container);
 
 		add(new TextBlock(
 			'<p>Write notes to your friends. <strong>Bold</strong>, <em>italic</em>, headings — make it yours.</p>',
-			560, 140, 0xc8e6c9, noteOpts(360), '\u270d\ufe0f Rich Text',
+			600, 140, 0xc8e6c9, noteOpts(420), '\u270d\ufe0f Rich Text',
 		).container);
 
 		add(new TextBlock(
 			'<ul><li>Project Hail Mary</li><li>BUGONIA</li><li>One Battle After Another</li></ul>',
-			140, 480, 0xbbdefb, noteOpts(340), '\ud83c\udfac Movie Watchlist',
+			140, 480, 0xbbdefb, noteOpts(400), '\ud83c\udfac Movie Watchlist',
 		).container);
 
 		add(new TextBlock(
-			'<p>Drag notes anywhere. Resize them. Pick a color. This is your space — organize it how you want.</p>',
-			520, 520, 0xf8bbd0, noteOpts(380), '\ud83c\udfa8 Your Canvas',
+			'<p>Drag notes anywhere. Resize them. Pick a color. Your space — organize it how you want.</p>',
+			560, 520, 0xf8bbd0, noteOpts(440), '\ud83c\udfa8 Your Canvas',
 		).container);
 
 		add(new TextBlock(
-			'<p>Spirited Away, The Grand Budapest Hotel, Moonlight</p>',
-			920, 280, 0xffe0b2, noteOpts(340), '\ud83c\udf1f Movie Night Picks',
+			'<p>Tatsu Ramen, Jitlada Thai, Bavel, Guerrilla Tacos, Howlin Rays</p>',
+			920, 280, 0xffe0b2, noteOpts(420), '🍜 Restaurants to Try',
 		).container);
 
 		// ── TOP-RIGHT: Beacons showcase ──────────────────────────────────
@@ -1033,94 +1033,105 @@ export class CanvasRenderer {
 			animate: true,
 		};
 
+		// Realistic times: today 9am-3pm, tomorrow 6:30am-7:30am, 2 days out 7pm-11pm
+		const today9am = new Date(); today9am.setHours(9, 0, 0, 0);
+		const today3pm = new Date(); today3pm.setHours(15, 0, 0, 0);
+		// Next Wednesday at 6:30pm
+		const wed630pm = new Date(); wed630pm.setDate(wed630pm.getDate() + ((3 - wed630pm.getDay() + 7) % 7 || 7)); wed630pm.setHours(18, 30, 0, 0);
+		const wed730pm = new Date(wed630pm); wed730pm.setHours(19, 30, 0, 0);
+		const fri7pm = new Date(); fri7pm.setDate(fri7pm.getDate() + 2); fri7pm.setHours(19, 0, 0, 0);
+		const fri11pm = new Date(); fri11pm.setDate(fri11pm.getDate() + 2); fri11pm.setHours(23, 0, 0, 0);
+
 		add(new BeaconObject({
-			title: 'Friday Hangout',
+			title: 'Remote Work',
 			description: 'Pull up!',
-			startTime: Date.now() + 3600000,
-			endTime: Date.now() + 7200000,
+			startTime: today9am.getTime(),
+			endTime: today3pm.getTime(),
 			visibilityType: 'canvas',
-			locationAddress: 'The usual spot',
+			locationAddress: 'Coffee Dose',
 		}, 1900, 120, beaconBase).container);
 
 		add(new BeaconObject({
-			title: 'Park Run',
-			description: '5K Saturday morning',
-			startTime: Date.now() + 86400000,
-			endTime: Date.now() + 86400000 + 3600000,
+			title: 'Run Club',
+			description: 'Morning miles',
+			startTime: wed630pm.getTime(),
+			endTime: wed730pm.getTime(),
 			visibilityType: 'canvas',
-			locationAddress: 'Prospect Park',
+			locationAddress: 'Laguna Beach',
 		}, 2350, 160, beaconBase).container);
 
 		add(new BeaconObject({
-			title: 'Game Night',
+			title: 'Catan Night',
 			description: 'Bring snacks',
-			startTime: Date.now() + 172800000,
-			endTime: Date.now() + 172800000 + 10800000,
-			visibilityType: 'direct',
-			fromUsername: 'brandon',
-		}, 2050, 500, { ...beaconBase, isDirect: true }).container);
+			startTime: fri7pm.getTime(),
+			endTime: fri11pm.getTime(),
+			visibilityType: 'canvas',
+			locationAddress: "Joe's spot",
+		}, 2050, 500, beaconBase).container);
 
 		// Beacon explainer note
 		add(new TextBlock(
-			'<p>Beacons are spontaneous or planned hangouts. They pulse with life and expire when the moment passes.</p>',
-			1900, 840, 0xffe0b2, noteOpts(380), '\ud83d\udd25 Beacons',
+			'<p>Beacons are spontaneous or planned hangouts. They pulse and expire when the moment passes.</p>',
+			1900, 840, 0xffe0b2, noteOpts(440), '\ud83d\udd25 Beacons',
 		).container);
 
 		// ── BOTTOM-LEFT: Photos showcase ─────────────────────────────────
-		// Placeholder Polaroids — gray placeholders until real images are provided
 		add(new PhotoObject({
 			storageId: 'demo-1',
-			caption: 'Summer vibes',
+			imageUrl: '/landing-rocko-beach.jpg',
+			caption: 'Beach day with Rocko',
 			rotation: -3,
-		}, 150, 1150, { editable: true, animate: true }).container);
+		}, 150, 1000, { editable: true, animate: true }).container);
 
 		add(new PhotoObject({
 			storageId: 'demo-2',
-			caption: 'Taco Tuesday',
+			imageUrl: '/landing-yosemite.jpg',
+			caption: 'Yosemite Valley',
 			rotation: 2,
-		}, 520, 1200, { editable: true, animate: true }).container);
+		}, 520, 1050, { editable: true, animate: true }).container);
 
 		add(new PhotoObject({
 			storageId: 'demo-3',
-			caption: 'Rocko at the park',
+			imageUrl: '/landing-rocko-fry.jpg',
+			caption: 'Rocko vs. the french fry',
 			rotation: -1,
-		}, 880, 1120, { editable: true, animate: true }).container);
+		}, 880, 970, { editable: true, animate: true }).container);
 
 		// Photo explainer note
 		add(new TextBlock(
-			'<p>Drop photos right on the canvas. Polaroid style — with captions and a little tilt.</p>',
-			200, 1650, 0xe1bee7, noteOpts(380), '\ud83d\udcf8 Photos',
+			'<p>Drop photos on the canvas. Polaroid style — captions and a little tilt.</p>',
+			200, 1650, 0xe1bee7, noteOpts(440), '\ud83d\udcf8 Photos',
 		).container);
 
 		// ── BOTTOM-RIGHT: Music showcase ─────────────────────────────────
 		add(new MusicObject({
-			url: 'https://open.spotify.com/track/demo1',
+			url: 'https://open.spotify.com/track/0nj9Bq5sHDiTxSHunhgkFb?si=42246d2df63b4364',
 			platform: 'spotify',
-			title: 'Redbone',
-			artist: 'Childish Gambino',
-			embedUrl: '',
+			title: 'Squabble Up',
+			artist: 'Kendrick Lamar',
+			embedUrl: 'https://open.spotify.com/embed/track/0nj9Bq5sHDiTxSHunhgkFb',
 		}, 1900, 1150, { editable: true, animate: true }).container);
 
 		add(new MusicObject({
-			url: 'https://music.youtube.com/watch?v=demo2',
+			url: 'https://music.youtube.com/watch?v=r78xfXZb_WU&si=a0_Ub5vKEvZsbkll',
 			platform: 'youtube-music',
 			title: 'Electric Feel',
 			artist: 'MGMT',
-			embedUrl: '',
+			embedUrl: 'https://www.youtube.com/embed/r78xfXZb_WU',
 		}, 1950, 1340, { editable: true, animate: true }).container);
 
 		add(new MusicObject({
-			url: 'https://music.apple.com/demo3',
+			url: 'https://music.apple.com/us/song/nuevayol/1787022572',
 			platform: 'apple-music',
-			title: 'Best Part',
-			artist: 'Daniel Caesar ft. H.E.R.',
-			embedUrl: '',
+			title: 'NUEVAYOL',
+			artist: 'Bad Bunny',
+			embedUrl: 'https://embed.music.apple.com/us/song/nuevayol/1787022572',
 		}, 2000, 1530, { editable: true, animate: true }).container);
 
 		// Music explainer note
 		add(new TextBlock(
-			'<p>Share music from Spotify, YouTube, or Apple Music. It plays right on the canvas.</p>',
-			2420, 1200, 0xb2dfdb, noteOpts(380), '\ud83c\udfb5 Music',
+			'<p>Share music from Spotify, YouTube, or Apple Music. Plays right on the canvas.</p>',
+			2420, 1200, 0xb2dfdb, noteOpts(440), '\ud83c\udfb5 Music',
 		).container);
 
 		// ── CENTER: Auth card ────────────────────────────────────────────

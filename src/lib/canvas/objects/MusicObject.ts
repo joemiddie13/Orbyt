@@ -1,7 +1,7 @@
 import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import { gsap } from '../gsapInit';
-import { FONT_FAMILY } from '../textStyles';
-import { makeDraggable, makeLongPressable, makeTappable } from '../interactions/DragDrop';
+import { FONT_FAMILY, CURSOR_POINTER } from '../textStyles';
+import { makeDraggable, makeLongPressable, makeTappable, makeHoverable } from '../interactions/DragDrop';
 
 /**
  * MusicObject — a dark rounded card on the canvas representing a music link.
@@ -80,6 +80,7 @@ export class MusicObject {
 	private glowBg: Graphics;
 	private playing = false;
 	private platformColor: number;
+	private cleanupHover: (() => void) | null = null;
 
 	constructor(content: MusicContent, x: number, y: number, options: MusicObjectOptions = {}) {
 		this.objectId = options.objectId;
@@ -132,7 +133,7 @@ export class MusicObject {
 		if (options.editable !== false && options.onDelete) {
 			const delBtn = new Container();
 			delBtn.eventMode = 'static';
-			delBtn.cursor = 'pointer';
+			delBtn.cursor = CURSOR_POINTER;
 
 			// Center point of the button
 			const cx = CARD_WIDTH - 14;
@@ -176,7 +177,7 @@ export class MusicObject {
 		// ── Title ──────────────────────────────────────────────────────
 		const titleStyle = new TextStyle({
 			fontFamily: FONT_FAMILY,
-			fontSize: 28,
+			fontSize: 24,
 			fontWeight: 'bold',
 			fill: 0xffffff,
 			wordWrap: true,
@@ -184,24 +185,24 @@ export class MusicObject {
 		});
 		this.titleText = new Text({ text: content.title || 'Unknown', style: titleStyle });
 		this.titleText.x = TEXT_LEFT;
-		this.titleText.y = 18;
+		this.titleText.y = 16;
 		this.container.addChild(this.titleText);
 
-		// ── Artist ─────────────────────────────────────────────────────
+		// ── Artist (positioned dynamically below title) ───────────────
 		const artistStyle = new TextStyle({
 			fontFamily: FONT_FAMILY,
-			fontSize: 22,
+			fontSize: 18,
 			fill: 0xffffff,
 			wordWrap: true,
 			wordWrapWidth: TEXT_MAX_W,
 		});
 		this.artistText = new Text({ text: content.artist || '', style: artistStyle });
 		this.artistText.x = TEXT_LEFT;
-		this.artistText.y = 52;
+		this.artistText.y = this.titleText.y + this.titleText.height + 6;
 		this.artistText.alpha = 0.6;
 		this.container.addChild(this.artistText);
 
-		// ── Platform label (skip for Apple Music — embed already shows it) ──
+		// ── Platform label (positioned below artist) ──────────────────
 		if (content.platform !== 'apple-music') {
 			const PLATFORM_LABELS: Record<string, string> = {
 				spotify: 'Spotify',
@@ -211,12 +212,12 @@ export class MusicObject {
 			const platformLabel = PLATFORM_LABELS[content.platform] ?? content.platform;
 			const platformStyle = new TextStyle({
 				fontFamily: FONT_FAMILY,
-				fontSize: 18,
+				fontSize: 14,
 				fill: this.platformColor,
 			});
 			const platformText = new Text({ text: platformLabel, style: platformStyle });
 			platformText.x = TEXT_LEFT;
-			platformText.y = 92;
+			platformText.y = this.artistText.y + this.artistText.height + 6;
 			platformText.alpha = 0.8;
 			this.container.addChild(platformText);
 		}
@@ -292,6 +293,9 @@ export class MusicObject {
 				if (this.objectId) options.onTap!(this.objectId);
 			});
 		}
+
+		// Hover expand
+		this.cleanupHover = makeHoverable(this.container);
 
 		// Pop-in animation
 		if (options.animate !== false) {
@@ -375,6 +379,7 @@ export class MusicObject {
 
 	/** Kill all running GSAP tweens — call before removal */
 	destroy() {
+		this.cleanupHover?.();
 		gsap.killTweensOf(this.container);
 		gsap.killTweensOf(this.container.scale);
 		gsap.killTweensOf(this.glowBg);

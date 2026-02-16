@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <!-- Open hand — fingers up, palm facing out -->
+  <!-- Index finger -->
+  <rect x="7" y="1" width="3" height="9" rx="1.5" fill="#1a1814" stroke="#F59E0B" stroke-width="1.2"/>
+  <!-- Middle finger -->
+  <rect x="11" y="0" width="3" height="10" rx="1.5" fill="#1a1814" stroke="#F59E0B" stroke-width="1.2"/>
+  <!-- Ring finger -->
+  <rect x="15" y="2" width="3" height="8" rx="1.5" fill="#1a1814" stroke="#F59E0B" stroke-width="1.2"/>
+  <!-- Thumb -->
+  <rect x="3" y="7" width="3" height="7" rx="1.5" fill="#1a1814" stroke="#F59E0B" stroke-width="1.2" transform="rotate(-15 4.5 10.5)"/>
+  <!-- Palm -->
+  <rect x="5" y="9" width="14" height="10" rx="3" fill="#1a1814" stroke="#F59E0B" stroke-width="1.2"/>
+</svg>

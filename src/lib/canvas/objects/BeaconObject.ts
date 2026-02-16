@@ -1,7 +1,7 @@
 import { Container, Graphics, Rectangle, Sprite, Text, Texture, TextStyle } from 'pixi.js';
 import { gsap } from '../gsapInit';
-import { FONT_FAMILY } from '../textStyles';
-import { makeDraggable, makeLongPressable, makeTappable } from '../interactions/DragDrop';
+import { FONT_FAMILY, CURSOR_POINTER } from '../textStyles';
+import { makeDraggable, makeLongPressable, makeTappable, makeHoverable } from '../interactions/DragDrop';
 
 /**
  * BeaconObject — a living broadcast signal on the canvas.
@@ -103,6 +103,7 @@ export class BeaconObject {
 
 	// Response dots
 	private responseDots: Graphics | null = null;
+	private cleanupHover: (() => void) | null = null;
 
 	constructor(content: BeaconContent, x: number, y: number, options: BeaconObjectOptions = {}) {
 		this.objectId = options.objectId;
@@ -221,63 +222,50 @@ export class BeaconObject {
 			fontWeight: 'bold',
 			fill: 0xffffff,
 			wordWrap: true,
-			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2 - 28,
+			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
 			lineHeight: 40,
 		});
 		const titleText = new Text({ text: content.title, style: titleStyle });
-		titleText.x = BEACON_PADDING + 24;
+		titleText.x = BEACON_PADDING;
 		titleText.y = BEACON_PADDING;
 		this.container.addChild(titleText);
 
-		// Pin icon — bright on dark background
-		const pin = new Graphics();
-		pin.circle(BEACON_PADDING + 10, BEACON_PADDING + 12, 8);
-		pin.fill(0xffffff);
-		pin.circle(BEACON_PADDING + 10, BEACON_PADDING + 12, 3);
-		pin.fill(this.baseColor);
-		this.container.addChild(pin);
-
-		// Time display
-		const timeStr = this.formatTimeRange(content.startTime, content.endTime);
-		const timeStyle = new TextStyle({
+		// Date line (separate from time)
+		const { dateStr, timeStr } = this.formatDateAndTime(content.startTime, content.endTime);
+		const detailStyle = new TextStyle({
 			fontFamily: FONT_FAMILY,
-			fontSize: 22,
+			fontSize: 20,
 			fill: 0xffffff,
 			wordWrap: true,
 			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
 		});
-		const timeText = new Text({ text: timeStr, style: timeStyle });
+		const dateText = new Text({ text: dateStr, style: detailStyle });
+		dateText.x = BEACON_PADDING;
+		dateText.y = titleText.y + titleText.height + 16;
+		dateText.alpha = 0.85;
+		this.container.addChild(dateText);
+
+		// Time line
+		const timeText = new Text({ text: timeStr, style: detailStyle });
 		timeText.x = BEACON_PADDING;
-		timeText.y = titleText.y + titleText.height + 8;
-		timeText.alpha = 0.85;
+		timeText.y = dateText.y + dateText.height + 8;
+		timeText.alpha = 0.75;
 		this.container.addChild(timeText);
 
 		// "From [username]" for direct beacons — above bottom info
 		if (isDirect && content.fromUsername) {
-			const fromStyle = new TextStyle({
-				fontFamily: FONT_FAMILY,
-				fontSize: 22,
-				fill: 0xffffff,
-			});
-			const fromText = new Text({ text: `From ${content.fromUsername}`, style: fromStyle });
+			const fromText = new Text({ text: `From ${content.fromUsername}`, style: detailStyle });
 			fromText.x = BEACON_PADDING;
-			fromText.y = this.cardHeight - BEACON_PADDING - (content.locationAddress ? 34 : 16);
+			fromText.y = this.cardHeight - BEACON_PADDING - (content.locationAddress ? 58 : 30);
 			fromText.alpha = 0.7;
 			this.container.addChild(fromText);
 		}
 
-		// Location — pinned to bottom of card
+		// Location — pinned to bottom with proper padding
 		if (content.locationAddress) {
-			const locStyle = new TextStyle({
-				fontFamily: FONT_FAMILY,
-				fontSize: 22,
-				fill: 0xffffff,
-				wordWrap: true,
-				wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
-			});
-			const locText = new Text({ text: `📍 ${content.locationAddress}`, style: locStyle });
+			const locText = new Text({ text: `📍 ${content.locationAddress}`, style: detailStyle });
 			locText.x = BEACON_PADDING;
-			locText.y = this.cardHeight - BEACON_PADDING - 16;
+			locText.y = this.cardHeight - BEACON_PADDING - 28;
 			locText.alpha = 0.75;
 			this.container.addChild(locText);
 		}
@@ -301,7 +289,7 @@ export class BeaconObject {
 		if (options.editable !== false && options.onDelete) {
 			const delBtn = new Container();
 			delBtn.eventMode = 'static';
-			delBtn.cursor = 'pointer';
+			delBtn.cursor = CURSOR_POINTER;
 
 			const cx = BEACON_WIDTH - 14;
 			const cy = this.cardHeight - 14;
@@ -390,6 +378,9 @@ export class BeaconObject {
 				},
 			});
 		}
+
+		// Hover expand
+		this.cleanupHover = makeHoverable(this.container);
 
 		// Start living pulse if not expired
 		if (!this.isExpired) {
@@ -650,6 +641,7 @@ export class BeaconObject {
 			gsap.ticker.remove(this.animTick);
 			this.animTick = null;
 		}
+		this.cleanupHover?.();
 		this.stopPulse();
 		// Clean up halftone sprites + cached texture
 		this.halftoneDots = [];
@@ -698,14 +690,14 @@ export class BeaconObject {
 		return Math.max(h, 100);
 	}
 
-	private formatTimeRange(start: number, end: number): string {
+	private formatDateAndTime(start: number, end: number): { dateStr: string; timeStr: string } {
 		const s = new Date(start);
 		const e = new Date(end);
 		const now = new Date();
 		const isToday = s.toDateString() === now.toDateString();
-		const dayLabel = isToday ? 'Today' : s.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+		const dateStr = isToday ? 'Today' : s.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 		const startTime = s.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 		const endTime = e.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-		return `${dayLabel} · ${startTime} – ${endTime}`;
+		return { dateStr, timeStr: `${startTime} – ${endTime}` };
 	}
 }

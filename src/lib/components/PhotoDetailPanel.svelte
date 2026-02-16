@@ -364,19 +364,19 @@
 			<!-- Caption -->
 			{#if isOwner}
 				<div>
-					<label class="text-xs font-medium uppercase tracking-wider mb-2 block caption-label" style="font-family: 'Satoshi', sans-serif;">Caption</label>
+					<label class="text-xs font-medium uppercase tracking-wider mb-2 block caption-label" style="font-family: 'Geist Mono', monospace;">Caption</label>
 					<textarea
 						bind:value={editCaption}
 						placeholder="Add a caption..."
 						maxlength="500"
 						rows="2"
 						class="glass-input w-full rounded-lg px-3 py-2.5 text-sm resize-none"
-						style="font-family: 'Satoshi', sans-serif;"
+						style="font-family: 'Geist Mono', monospace;"
 					></textarea>
-					<p class="text-xs text-white/30 mt-1 text-right" style="font-family: 'Satoshi', sans-serif;">{editCaption.length}/500</p>
+					<p class="text-xs text-white/30 mt-1 text-right" style="font-family: 'Geist Mono', monospace;">{editCaption.length}/500</p>
 				</div>
 			{:else if photo.content.caption}
-				<p class="text-sm text-white/70" style="font-family: 'Satoshi', sans-serif;">{photo.content.caption}</p>
+				<p class="text-sm text-white/70" style="font-family: 'Geist Mono', monospace;">{photo.content.caption}</p>
 			{/if}
 
 			<!-- Actions -->

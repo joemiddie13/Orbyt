@@ -971,7 +971,7 @@
 
 		<div class="p-6 flex-shrink-0 relative z-10">
 			<div bind:this={header} class="flex items-center justify-between mb-5">
-				<h2 class="text-xl font-semibold text-white" style="font-family: 'Satoshi', sans-serif;">Broadcast Signal</h2>
+				<h2 class="text-xl font-semibold text-white" style="font-family: 'Geist Mono', monospace;">Broadcast Signal</h2>
 				<button
 					onclick={handleClose}
 					class="text-white/40 hover:text-white/70 transition cursor-pointer"
@@ -1016,7 +1016,7 @@
 				</div>
 
 				{#if aiError}
-					<p class="text-sm text-red-400/70 text-center mt-2" style="font-family: 'Satoshi', sans-serif;">{aiError}</p>
+					<p class="text-sm text-red-400/70 text-center mt-2" style="font-family: 'Geist Mono', monospace;">{aiError}</p>
 				{/if}
 
 				{#if aiSuggestions.length > 0}
@@ -1029,8 +1029,8 @@
 							>
 								<span class="text-xl flex-shrink-0 suggestion-emoji">{suggestion.emoji}</span>
 								<div class="flex-1 min-w-0 text-left">
-									<p class="text-base font-medium text-white truncate suggestion-activity" style="font-family: 'Satoshi', sans-serif;">{suggestion.activity}</p>
-									<p class="text-sm text-white/40 truncate" style="font-family: 'Satoshi', sans-serif;">{suggestion.location}</p>
+									<p class="text-base font-medium text-white truncate suggestion-activity" style="font-family: 'Geist Mono', monospace;">{suggestion.activity}</p>
+									<p class="text-sm text-white/40 truncate" style="font-family: 'Geist Mono', monospace;">{suggestion.location}</p>
 								</div>
 								<svg class="w-3.5 h-3.5 text-white/20 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
@@ -1040,7 +1040,7 @@
 						<button
 							onclick={() => { aiSuggestions = []; }}
 							class="text-sm text-white/30 hover:text-white/50 transition cursor-pointer self-center mt-1"
-							style="font-family: 'Satoshi', sans-serif;"
+							style="font-family: 'Geist Mono', monospace;"
 						>
 							Dismiss
 						</button>
@@ -1172,7 +1172,7 @@
 		padding: 0.25rem 0.125rem;
 		outline: none;
 		transition: border-color 0.2s, box-shadow 0.2s;
-		font-family: 'Satoshi', sans-serif;
+		font-family: 'Geist Mono', monospace;
 	}
 
 	.sentence-input::placeholder {
@@ -1194,7 +1194,7 @@
 		color: rgba(255, 255, 255, 0.4);
 		font-size: 1.05rem;
 		white-space: nowrap;
-		font-family: 'Satoshi', sans-serif;
+		font-family: 'Geist Mono', monospace;
 	}
 
 	.visibility-toggle {
@@ -1206,7 +1206,7 @@
 		padding: 0;
 		text-shadow: 0 0 12px rgba(255, 167, 38, 0.4);
 		transition: color 0.3s, text-shadow 0.3s;
-		font-family: 'Satoshi', sans-serif;
+		font-family: 'Geist Mono', monospace;
 	}
 
 	.visibility-toggle:hover {
@@ -1226,7 +1226,7 @@
 		font-size: 0.85rem;
 		color: #FFA726;
 		text-shadow: 0 0 8px rgba(255, 167, 38, 0.3);
-		font-family: 'Satoshi', sans-serif;
+		font-family: 'Geist Mono', monospace;
 		letter-spacing: 0.02em;
 	}
 
@@ -1243,7 +1243,7 @@
 		color: rgba(255, 255, 255, 0.6);
 		border: 1px solid rgba(255, 255, 255, 0.1);
 		transition: all 0.2s;
-		font-family: 'Satoshi', sans-serif;
+		font-family: 'Geist Mono', monospace;
 	}
 
 	.friend-chip:hover {
@@ -1372,7 +1372,7 @@
 		font-size: 0.95rem;
 		padding: 10px 14px;
 		outline: none;
-		font-family: 'Satoshi', sans-serif;
+		font-family: 'Geist Mono', monospace;
 		position: relative;
 		z-index: 2;
 	}
@@ -1445,7 +1445,7 @@
 		background: rgba(167, 139, 250, 0.15);
 		color: rgba(167, 139, 250, 0.6);
 		letter-spacing: 0.03em;
-		font-family: 'Satoshi', sans-serif;
+		font-family: 'Geist Mono', monospace;
 		transition: box-shadow 0.3s, color 0.3s;
 	}
 

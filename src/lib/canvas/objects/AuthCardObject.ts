@@ -1,6 +1,6 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import { gsap } from '../gsapInit';
-import { FONT_FAMILY } from '../textStyles';
+import { FONT_FAMILY, CURSOR_GRAB } from '../textStyles';
 import { makeDraggable } from '../interactions/DragDrop';
 
 /**
@@ -28,6 +28,7 @@ export class AuthCardObject {
 	private allTexts: Text[] = [];
 	private dividers: Graphics[] = [];
 	private entranceTl: gsap.core.Timeline | null = null;
+	private floatTween: gsap.core.Tween | null = null;
 
 	constructor(x: number, y: number) {
 		this.cardWidth = CARD_WIDTH;
@@ -37,7 +38,7 @@ export class AuthCardObject {
 		this.container.x = x;
 		this.container.y = y;
 		this.container.eventMode = 'static';
-		this.container.cursor = 'grab';
+		this.container.cursor = CURSOR_GRAB;
 
 		// --- Glow layers (rendered first, behind everything) ---
 		this.glowOuter = new Graphics();
@@ -104,7 +105,25 @@ export class AuthCardObject {
 		this.spawnParticles(14);
 
 		// ── Draggable ──────────────────────────────────────────────────
-		makeDraggable(this.container, {});
+		makeDraggable(this.container, {
+			onDragStart: () => {
+				// Kill the float tween so it doesn't fight the drag
+				if (this.floatTween) {
+					this.floatTween.kill();
+					this.floatTween = null;
+				}
+			},
+			onDragEnd: () => {
+				// Restart float from new position
+				this.floatTween = gsap.to(this.container, {
+					y: this.container.y - 8,
+					duration: 4,
+					ease: 'sine.inOut',
+					repeat: -1,
+					yoyo: true,
+				});
+			},
+		});
 
 		// ── ENTRANCE CHOREOGRAPHY ──────────────────────────────────────
 		this.container.scale.set(0);
@@ -144,7 +163,7 @@ export class AuthCardObject {
 		});
 
 		// Card gently floats
-		gsap.to(this.container, {
+		this.floatTween = gsap.to(this.container, {
 			y: this.container.y - 8,
 			duration: 4,
 			ease: 'sine.inOut',
@@ -286,6 +305,7 @@ export class AuthCardObject {
 
 	private killAllTweens() {
 		if (this.entranceTl) { this.entranceTl.kill(); this.entranceTl = null; }
+		if (this.floatTween) { this.floatTween.kill(); this.floatTween = null; }
 		gsap.killTweensOf(this.container);
 		gsap.killTweensOf(this.container.scale);
 		gsap.killTweensOf(this.glowOuter);

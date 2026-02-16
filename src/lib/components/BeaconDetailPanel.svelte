@@ -600,7 +600,7 @@
 		<div class="p-6 pb-3 flex-shrink-0 relative z-10">
 			<div bind:this={header}>
 				<div class="flex items-start justify-between mb-3">
-					<h2 class="text-xl font-bold text-white flex-1 pr-4" style="font-family: 'Satoshi', sans-serif;">{beacon.content.title}</h2>
+					<h2 class="text-xl font-bold text-white flex-1 pr-4" style="font-family: 'Geist Mono', monospace;">{beacon.content.title}</h2>
 					<button
 						onclick={handleClose}
 						class="text-white/40 hover:text-white/70 transition cursor-pointer flex-shrink-0"
@@ -616,7 +616,7 @@
 						{formatDate(beacon.content.startTime)} &middot; {formatTime(beacon.content.startTime)} &ndash; {formatTime(beacon.content.endTime)}
 					</p>
 					{#if beacon.content.locationAddress}
-						<p class="text-sm text-white/60" style="font-family: 'Satoshi', sans-serif;">
+						<p class="text-sm text-white/60" style="font-family: 'Geist Mono', monospace;">
 							<span class="inline-block mr-1">&#x1F4CD;</span>{beacon.content.locationAddress}
 						</p>
 					{/if}
@@ -629,7 +629,7 @@
 
 			<!-- Description -->
 			{#if beacon.content.description}
-				<p class="text-sm text-white/70" style="font-family: 'Satoshi', sans-serif;">{beacon.content.description}</p>
+				<p class="text-sm text-white/70" style="font-family: 'Geist Mono', monospace;">{beacon.content.description}</p>
 			{/if}
 
 			<!-- Response buttons -->
@@ -660,7 +660,7 @@
 			<!-- Attendee lists -->
 			{#if joining.length > 0}
 				<div>
-					<p class="text-xs font-medium text-emerald-400 uppercase tracking-wider mb-1.5" style="font-family: 'Satoshi', sans-serif;">Going</p>
+					<p class="text-xs font-medium text-emerald-400 uppercase tracking-wider mb-1.5" style="font-family: 'Geist Mono', monospace;">Going</p>
 					<div class="flex flex-wrap gap-1.5">
 						{#each joining as person (person.userId)}
 							<button
@@ -674,7 +674,7 @@
 
 			{#if interested.length > 0}
 				<div>
-					<p class="text-xs font-medium text-amber-400 uppercase tracking-wider mb-1.5" style="font-family: 'Satoshi', sans-serif;">Interested</p>
+					<p class="text-xs font-medium text-amber-400 uppercase tracking-wider mb-1.5" style="font-family: 'Geist Mono', monospace;">Interested</p>
 					<div class="flex flex-wrap gap-1.5">
 						{#each interested as person (person.userId)}
 							<button
@@ -687,7 +687,7 @@
 			{/if}
 
 			{#if !responses.data || responses.data.length === 0}
-				<p class="text-sm text-white/40 text-center py-4" style="font-family: 'Satoshi', sans-serif;">No responses yet &mdash; be the first!</p>
+				<p class="text-sm text-white/40 text-center py-4" style="font-family: 'Geist Mono', monospace;">No responses yet &mdash; be the first!</p>
 			{/if}
 		</div>
 	</div>
@@ -715,7 +715,7 @@
 		font-size: 0.8rem;
 		color: #FFA726;
 		text-shadow: 0 0 8px rgba(255, 167, 38, 0.3);
-		font-family: 'Satoshi', sans-serif;
+		font-family: 'Geist Mono', monospace;
 		letter-spacing: 0.02em;
 	}
 

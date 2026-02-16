@@ -289,7 +289,7 @@
 		border: none;
 		outline: none;
 		background: transparent;
-		font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
+		font-family: 'Geist Mono', ui-monospace, monospace;
 		font-size: 1.75rem;
 		font-weight: 700;
 		color: #292524;

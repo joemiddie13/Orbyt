@@ -1,7 +1,7 @@
 import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import { gsap } from '../gsapInit';
 import { FONT_FAMILY } from '../textStyles';
-import { makeDraggable, makeLongPressable, makeTappable, animateDragLift, animateDragDrop } from '../interactions/DragDrop';
+import { makeDraggable, makeLongPressable, makeTappable, makeHoverable, animateDragLift, animateDragDrop } from '../interactions/DragDrop';
 
 /**
  * PhotoObject — a Polaroid-style photo on the canvas.
@@ -15,7 +15,9 @@ import { makeDraggable, makeLongPressable, makeTappable, animateDragLift, animat
  */
 
 const FRAME_PADDING = 16;
-const BOTTOM_PADDING = 56;
+const CAPTION_PAD_TOP = 8;
+const CAPTION_PAD_BOTTOM = 12;
+const MIN_BOTTOM_PADDING = 56;
 const CORNER_RADIUS = 5;
 const SHADOW_OFFSET = 5;
 const MAX_IMAGE_WIDTH = 320;
@@ -56,6 +58,7 @@ export class PhotoObject {
 	private baseRotation: number;
 	/** Random tilt delta added during drag lift */
 	private liftRotation = 0;
+	private cleanupHover: (() => void) | null = null;
 
 	constructor(content: PhotoContent, x: number, y: number, options: PhotoObjectOptions = {}) {
 		this.objectId = options.objectId;
@@ -76,6 +79,11 @@ export class PhotoObject {
 		this.frame = new Graphics();
 		this.container.addChild(this.frame);
 
+		// Caption first (so drawFrame knows the caption height)
+		if (content.caption) {
+			this.addCaption(content.caption);
+		}
+
 		// Draw initial frame at default size
 		this.drawFrame();
 
@@ -85,14 +93,14 @@ export class PhotoObject {
 		this.placeholder.fill(0xf0f0f0);
 		this.container.addChild(this.placeholder);
 
+		// Re-add caption on top of placeholder
+		if (this.captionText) {
+			this.container.addChild(this.captionText);
+		}
+
 		// Load image async — frame resizes to fit actual dimensions
 		if (content.imageUrl) {
 			this.loadImage(content.imageUrl);
-		}
-
-		// Caption
-		if (content.caption) {
-			this.addCaption(content.caption);
 		}
 
 		// Owner: drag + long-press. Visitor: long-press only.
@@ -126,6 +134,9 @@ export class PhotoObject {
 			});
 		}
 
+		// Hover expand
+		this.cleanupHover = makeHoverable(this.container);
+
 		// Pop-in animation
 		if (options.animate !== false) {
 			this.container.scale.set(0);
@@ -133,10 +144,12 @@ export class PhotoObject {
 		}
 	}
 
-	/** Draw/redraw the shadow and white frame to match current image dimensions */
+	/** Draw/redraw the shadow and white frame to match current image + caption dimensions */
 	private drawFrame() {
+		const captionHeight = this.captionText ? this.captionText.height : 0;
+		const bottomSpace = Math.max(MIN_BOTTOM_PADDING, CAPTION_PAD_TOP + captionHeight + CAPTION_PAD_BOTTOM);
 		const frameWidth = this.imageWidth + FRAME_PADDING * 2;
-		const frameHeight = this.imageHeight + FRAME_PADDING + BOTTOM_PADDING;
+		const frameHeight = this.imageHeight + FRAME_PADDING + bottomSpace;
 
 		this.shadow.clear();
 		this.shadow.roundRect(SHADOW_OFFSET, SHADOW_OFFSET, frameWidth, frameHeight, CORNER_RADIUS);
@@ -183,11 +196,12 @@ export class PhotoObject {
 				this.placeholder = null;
 			}
 
-			// Reposition caption for new frame size
+			// Reposition caption and redraw frame for new image + caption size
 			if (this.captionText) {
-				this.captionText.y = FRAME_PADDING + this.imageHeight + 8;
+				this.captionText.y = FRAME_PADDING + this.imageHeight + CAPTION_PAD_TOP;
 				this.captionText.style.wordWrapWidth = this.imageWidth;
 			}
+			this.drawFrame();
 		} catch (err) {
 			console.error('Failed to load photo:', err);
 		}
@@ -196,7 +210,7 @@ export class PhotoObject {
 	private addCaption(text: string) {
 		const style = new TextStyle({
 			fontFamily: FONT_FAMILY,
-			fontSize: 22,
+			fontSize: 18,
 			fill: 0x333333,
 			wordWrap: true,
 			wordWrapWidth: this.imageWidth,
@@ -204,7 +218,7 @@ export class PhotoObject {
 		});
 		this.captionText = new Text({ text, style });
 		this.captionText.x = FRAME_PADDING;
-		this.captionText.y = FRAME_PADDING + this.imageHeight + 8;
+		this.captionText.y = FRAME_PADDING + this.imageHeight + CAPTION_PAD_TOP;
 		this.container.addChild(this.captionText);
 	}
 
@@ -212,8 +226,10 @@ export class PhotoObject {
 	updateCaption(newCaption: string) {
 		if (this.captionText) {
 			this.captionText.text = newCaption;
+			this.drawFrame(); // Redraw frame to fit new caption height
 		} else if (newCaption) {
 			this.addCaption(newCaption);
+			this.drawFrame();
 		}
 	}
 
@@ -229,6 +245,7 @@ export class PhotoObject {
 
 	/** Kill all running GSAP tweens — call before removal */
 	destroy() {
+		this.cleanupHover?.();
 		gsap.killTweensOf(this.container);
 		gsap.killTweensOf(this.container.scale);
 	}

@@ -4,6 +4,74 @@ import { getAuthenticatedUser } from "./users";
 import { checkCanvasAccess } from "./access";
 import { validateBeaconContent, validateBeaconTiming } from "./validators";
 
+/** Check if any friends have active beacons — returns canvas IDs with activity */
+export const getFriendBeaconActivity = query({
+	args: {},
+	handler: async (ctx) => {
+		const user = await getAuthenticatedUser(ctx).catch(() => null);
+		if (!user) return { hasFriendBeacons: false, activeCanvasIds: [] };
+
+		// Get accepted friendships (same pattern as access.ts:getAccessibleCanvases)
+		const [asRequester, asReceiver] = await Promise.all([
+			ctx.db
+				.query("friendships")
+				.withIndex("by_requester_status", (q) =>
+					q.eq("requesterId", user.uuid).eq("status", "accepted")
+				)
+				.collect(),
+			ctx.db
+				.query("friendships")
+				.withIndex("by_receiver_status", (q) =>
+					q.eq("receiverId", user.uuid).eq("status", "accepted")
+				)
+				.collect(),
+		]);
+
+		const friendUuids = [
+			...asRequester.map((f) => f.receiverId),
+			...asReceiver.map((f) => f.requesterId),
+		];
+
+		if (friendUuids.length === 0) return { hasFriendBeacons: false, activeCanvasIds: [] };
+
+		// Fetch each friend's personal canvas
+		const friendCanvases = await Promise.all(
+			friendUuids.map((uuid) =>
+				ctx.db
+					.query("canvases")
+					.withIndex("by_owner_type", (q) => q.eq("ownerId", uuid).eq("type", "personal"))
+					.first()
+			)
+		);
+
+		const now = Date.now();
+
+		// For each canvas, check for active beacons
+		const activeCanvasIds: string[] = [];
+		await Promise.all(
+			friendCanvases.filter(Boolean).map(async (canvas) => {
+				const beacons = await ctx.db
+					.query("canvasObjects")
+					.withIndex("by_canvas", (q) => q.eq("canvasId", canvas!._id))
+					.collect();
+
+				const hasActive = beacons.some(
+					(obj) => obj.type === "beacon" && (!obj.expiresAt || obj.expiresAt > now)
+				);
+
+				if (hasActive) {
+					activeCanvasIds.push(canvas!._id);
+				}
+			})
+		);
+
+		return {
+			hasFriendBeacons: activeCanvasIds.length > 0,
+			activeCanvasIds,
+		};
+	},
+});
+
 /** Get active (non-expired) beacons on a canvas */
 export const getActiveBeacons = query({
 	args: { canvasId: v.id("canvases") },

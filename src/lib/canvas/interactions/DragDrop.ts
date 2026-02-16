@@ -1,5 +1,6 @@
 import { Container, type FederatedPointerEvent } from 'pixi.js';
 import { gsap } from '../gsapInit';
+import { CURSOR_DEFAULT, CURSOR_GRAB, CURSOR_GRABBING } from '../textStyles';
 
 /**
  * DragDrop — makes a PixiJS container draggable with long-press support.
@@ -38,7 +39,7 @@ export function makeLongPressable(target: Container, onLongPress: (screenX: numb
 	let fired = false;
 
 	target.eventMode = 'static';
-	target.cursor = 'default';
+	target.cursor = CURSOR_DEFAULT;
 
 	target.on('pointerdown', (event: FederatedPointerEvent) => {
 		isDown = true;
@@ -94,13 +95,13 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 	let dragStartFired = false;
 
 	target.eventMode = 'static';
-	target.cursor = 'grab';
+	target.cursor = CURSOR_GRAB;
 
 	target.on('pointerdown', (event: FederatedPointerEvent) => {
 		isDragging = true;
 		longPressFired = false;
 		dragStartFired = false;
-		target.cursor = 'grabbing';
+		target.cursor = CURSOR_GRABBING;
 
 		startScreenX = event.globalX;
 		startScreenY = event.globalY;
@@ -119,7 +120,7 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 				if (isDragging && !longPressFired) {
 					longPressFired = true;
 					isDragging = false;
-					target.cursor = 'grab';
+					target.cursor = CURSOR_GRAB;
 					options.onLongPress!(startScreenX, startScreenY);
 				}
 			}, LONG_PRESS_DURATION);
@@ -168,7 +169,7 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 			return;
 		}
 		isDragging = false;
-		target.cursor = 'grab';
+		target.cursor = CURSOR_GRAB;
 		options.onDragEnd?.(target.x, target.y);
 	}
 
@@ -253,4 +254,57 @@ export function animateDragDrop(container: Container, liftRotation: number, base
 		duration: 0.2,
 		ease: 'power2.out',
 	});
+}
+
+/**
+ * Hover expand — scale up + subtle lift when the pointer enters.
+ * Skips hover animation while the object is being dragged.
+ * Returns a cleanup function to remove listeners.
+ */
+export function makeHoverable(target: Container, scale = 1.03): () => void {
+	let isDragging = false;
+	let hoverTween: gsap.core.Tween | null = null;
+
+	const onDragStart = () => { isDragging = true; };
+	const onDragEnd = () => {
+		isDragging = false;
+		// Don't snap back here — drag drop animation handles that
+	};
+
+	const onOver = () => {
+		if (isDragging) return;
+		hoverTween?.kill();
+		hoverTween = gsap.to(target.scale, {
+			x: scale, y: scale,
+			duration: 0.25,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+	};
+
+	const onOut = () => {
+		if (isDragging) return;
+		hoverTween?.kill();
+		hoverTween = gsap.to(target.scale, {
+			x: 1, y: 1,
+			duration: 0.3,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+	};
+
+	target.on('pointerover', onOver);
+	target.on('pointerout', onOut);
+	target.on('pointerdown', onDragStart);
+	target.on('pointerup', onDragEnd);
+	target.on('pointerupoutside', onDragEnd);
+
+	return () => {
+		hoverTween?.kill();
+		target.off('pointerover', onOver);
+		target.off('pointerout', onOut);
+		target.off('pointerdown', onDragStart);
+		target.off('pointerup', onDragEnd);
+		target.off('pointerupoutside', onDragEnd);
+	};
 }

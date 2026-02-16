@@ -8,13 +8,17 @@
 		canvasName = 'My Canvas',
 		onSelect,
 		onCreateNew,
+		activeBeaconCanvasIds = [],
 	}: {
 		activeCanvasId: string | null;
 		canvases: any[] | undefined;
 		canvasName?: string;
 		onSelect: (canvasId: string, canvasName: string) => void;
 		onCreateNew: () => void;
+		activeBeaconCanvasIds?: string[];
 	} = $props();
+
+	const beaconCanvasSet = $derived(new Set(activeBeaconCanvasIds));
 
 	let open = $state(false);
 	let popover = $state<HTMLDivElement>(undefined!);
@@ -112,11 +116,19 @@
 							onclick={() => select(canvas._id, canvas.name)}
 							class="canvas-item"
 							class:active={canvas._id === activeCanvasId}
+							class:has-beacon={beaconCanvasSet.has(canvas._id)}
 						>
 							<span class="canvas-icon">
 								{#if canvas.type === 'personal'}🏠{:else}👥{/if}
 							</span>
 							<span class="canvas-name">{canvas.name}</span>
+							{#if beaconCanvasSet.has(canvas._id)}
+								<svg class="beacon-icon" width="14" height="14" viewBox="0 0 20 20" fill="none">
+									<circle cx="10" cy="14" r="2" fill="#f5a623" opacity="0.95"/>
+									<path d="M6.5 10 A5 5 0 0 1 13.5 10" stroke="#f5a623" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.7"/>
+									<path d="M4 7 A8 8 0 0 1 16 7" stroke="#f5a623" stroke-width="1.3" stroke-linecap="round" fill="none" opacity="0.4"/>
+								</svg>
+							{/if}
 							{#if canvas.role !== 'owner'}
 								<span class="canvas-role">{canvas.role}</span>
 							{/if}
@@ -245,5 +257,26 @@
 
 	.create-btn:hover {
 		background: rgba(245, 158, 11, 0.12);
+	}
+
+	/* Warm pulse ring for canvases with active friend beacons */
+	.canvas-item.has-beacon {
+		box-shadow: inset 0 0 0 1px rgba(245, 166, 35, 0.3);
+		animation: beaconPulse 2.5s ease-in-out infinite;
+	}
+
+	@keyframes beaconPulse {
+		0%, 100% { box-shadow: inset 0 0 0 1px rgba(245, 166, 35, 0.2); }
+		50% { box-shadow: inset 0 0 0 1.5px rgba(245, 166, 35, 0.45), 0 0 8px rgba(245, 166, 35, 0.15); }
+	}
+
+	.beacon-icon {
+		flex-shrink: 0;
+		animation: beaconIconPulse 2.5s ease-in-out infinite;
+	}
+
+	@keyframes beaconIconPulse {
+		0%, 100% { opacity: 0.6; transform: scale(1); }
+		50% { opacity: 1; transform: scale(1.15); }
 	}
 </style>
