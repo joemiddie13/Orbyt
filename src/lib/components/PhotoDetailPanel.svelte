@@ -382,15 +382,14 @@
 			<!-- Actions -->
 			{#if isOwner}
 				<div class="flex gap-2 pt-1">
-					{#if isModified}
 						<button
 							onclick={save}
-							disabled={saving}
+							disabled={saving || !isModified}
 							class="lego-btn lego-violet flex-1 cursor-pointer"
+							class:btn-dimmed={!isModified}
 						>
 							{saving ? 'Saving...' : 'Save Caption'}
 						</button>
-					{/if}
 					<button
 						onclick={deletePhoto}
 						disabled={deleting}
@@ -448,6 +447,11 @@
 
 	.polaroid-image.loaded {
 		opacity: 1;
+	}
+
+	.btn-dimmed {
+		opacity: 0.35;
+		cursor: default !important;
 	}
 
 	.polaroid-placeholder {

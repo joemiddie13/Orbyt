@@ -214,12 +214,11 @@ export const getAccessibleCanvases = query({
 		const [sharedCanvases, ...friendCanvases] = await Promise.all([
 			// Batch-fetch all shared canvases at once
 			Promise.all(accessRecords.map((record) => ctx.db.get(record.canvasId))),
-			// Fetch each friend's personal canvas
+			// Fetch each friend's personal canvas (compound index — no post-filter)
 			...friendUuids.map((uuid) =>
 				ctx.db
 					.query("canvases")
-					.withIndex("by_owner", (q) => q.eq("ownerId", uuid))
-					.filter((q) => q.eq(q.field("type"), "personal"))
+					.withIndex("by_owner_type", (q) => q.eq("ownerId", uuid).eq("type", "personal"))
 					.first()
 			),
 		]);

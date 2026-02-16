@@ -87,6 +87,9 @@ export class CanvasRenderer {
 	/** Active stagger tweens — killed on canvas switch to prevent orphans (#9) */
 	private activeStaggerTweens: gsap.core.Tween[] = [];
 
+	/** Persistent container for grid/dot overlay — stays at correct z-position */
+	private overlayLayer!: Container;
+
 	/** Callback for when an object drag begins (movement confirmed) */
 	onObjectDragStart?: (objectId: string) => void;
 
@@ -633,6 +636,10 @@ export class CanvasRenderer {
 		fill.stroke({ width: 1.5, color: 0xBFA98A, alpha: 0.6 });
 		this.world.addChild(fill);
 
+		// Grid/dot overlay layer — container stays at correct z-position
+		this.overlayLayer = new Container();
+		this.world.addChild(this.overlayLayer);
+
 		// Subtle breathing animation on outer glow
 		gsap.to(outerGlow, {
 			alpha: 0.07,
@@ -641,6 +648,43 @@ export class CanvasRenderer {
 			repeat: -1,
 			yoyo: true,
 		});
+	}
+
+	/** Set the canvas overlay mode (none, dots, or lines) */
+	setOverlayMode(mode: 'none' | 'dots' | 'lines') {
+		if (!this.overlayLayer) return;
+
+		// Clear old overlay children
+		this.overlayLayer.removeChildren().forEach((c) => c.destroy());
+
+		if (mode === 'none') return;
+
+		const GRID = 50;
+		const COLOR = 0x9a8570;
+		const MARGIN = GRID;
+
+		const g = new Graphics();
+
+		if (mode === 'dots') {
+			for (let x = MARGIN; x <= this.canvasWidth - MARGIN; x += GRID) {
+				for (let y = MARGIN; y <= this.canvasHeight - MARGIN; y += GRID) {
+					g.circle(x, y, 2.5);
+				}
+			}
+			g.fill({ color: COLOR, alpha: 0.35 });
+		} else if (mode === 'lines') {
+			for (let x = MARGIN; x <= this.canvasWidth - MARGIN; x += GRID) {
+				g.moveTo(x, MARGIN);
+				g.lineTo(x, this.canvasHeight - MARGIN);
+			}
+			for (let y = MARGIN; y <= this.canvasHeight - MARGIN; y += GRID) {
+				g.moveTo(MARGIN, y);
+				g.lineTo(this.canvasWidth - MARGIN, y);
+			}
+			g.stroke({ width: 1, color: COLOR, alpha: 0.25 });
+		}
+
+		this.overlayLayer.addChild(g);
 	}
 
 	/**
@@ -816,9 +860,29 @@ export class CanvasRenderer {
 			options.push(opt);
 		}
 
+		// ── Debounced collapse (fixes pointer leaving parent→child gap) ──
+
+		let collapseTimeout: ReturnType<typeof setTimeout> | null = null;
+
+		function scheduleCollapse() {
+			if (collapseTimeout) return;
+			collapseTimeout = setTimeout(() => {
+				collapseTimeout = null;
+				collapse();
+			}, 100);
+		}
+
+		function cancelCollapse() {
+			if (collapseTimeout) {
+				clearTimeout(collapseTimeout);
+				collapseTimeout = null;
+			}
+		}
+
 		// ── Expand / collapse ───────────────────────────────────────────
 
 		function expand() {
+			cancelCollapse();
 			if (expanded) return;
 			expanded = true;
 
@@ -864,6 +928,7 @@ export class CanvasRenderer {
 		}
 
 		function collapse() {
+			cancelCollapse();
 			if (!expanded) return;
 			expanded = false;
 			const isH = currentDir === 'left' || currentDir === 'right';
@@ -898,8 +963,13 @@ export class CanvasRenderer {
 
 		// ── Events ──────────────────────────────────────────────────────
 
-		btn.on('pointerover', () => expand());
-		btn.on('pointerout', () => collapse());
+		btn.on('pointerover', () => { cancelCollapse(); expand(); });
+		btn.on('pointerout', () => scheduleCollapse());
+
+		// Cancel collapse when hovering over any emoji option (child→child transitions)
+		options.forEach((opt) => {
+			opt.on('pointerover', () => cancelCollapse());
+		});
 
 		// Prevent parent object handlers from firing when interacting with menu
 		btn.on('pointerdown', (e: FederatedPointerEvent) => {

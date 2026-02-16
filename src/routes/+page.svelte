@@ -18,6 +18,7 @@
 	import StickerPicker from '$lib/components/StickerPicker.svelte';
 	import PhotoDetailPanel from '$lib/components/PhotoDetailPanel.svelte';
 	import AddMusicModal from '$lib/components/AddMusicModal.svelte';
+	import CanvasStylePicker from '$lib/components/CanvasStylePicker.svelte';
 	import ViewerAvatars from '$lib/components/ViewerAvatars.svelte';
 	import { TextBlock } from '$lib/canvas/objects/TextBlock';
 
@@ -59,6 +60,7 @@
 	let selectedPhoto = $state<any>(null);
 	let showAddMusic = $state(false);
 	let playingMusicId = $state<string | null>(null);
+	let overlayMode = $state<'none' | 'dots' | 'lines'>('none');
 	let audioIframe: HTMLIFrameElement | null = null;
 	let morphWrapper: HTMLDivElement | null = null;
 
@@ -84,6 +86,16 @@
 			activeCanvasId = personalCanvas.data._id;
 			activeCanvasName = personalCanvas.data.name;
 		}
+	});
+
+	// Sync overlay mode from canvas data
+	$effect(() => {
+		const canvases = accessibleCanvases.data;
+		if (!canvases || !activeCanvasId) return;
+		const canvas = canvases.find((c: any) => c._id === activeCanvasId);
+		const mode = (canvas as any)?.overlayMode ?? 'none';
+		overlayMode = mode;
+		renderer?.setOverlayMode(mode);
 	});
 
 	// Query canvas objects for the active canvas
@@ -529,6 +541,19 @@
 		input.click();
 	}
 
+	/** Change the canvas overlay mode */
+	function changeOverlayMode(mode: 'none' | 'dots' | 'lines') {
+		console.log('[overlay] changeOverlayMode:', mode, 'renderer:', !!renderer);
+		overlayMode = mode;
+		renderer?.setOverlayMode(mode);
+		if (activeCanvasId) {
+			client.mutation(api.canvases.updateOverlayMode, {
+				canvasId: activeCanvasId as any,
+				overlayMode: mode,
+			}).catch((err: unknown) => console.error('Failed to save overlay mode:', err));
+		}
+	}
+
 	/** Switch to a different canvas */
 	function switchCanvas(canvasId: string, name: string) {
 		stopMusicPlayback();
@@ -808,6 +833,14 @@
 		onFriendsList={() => { showFriendsList = true; }}
 		onCanvasSwitcher={() => { showCanvasSwitcher = !showCanvasSwitcher; }}
 		{webrtcConnected}
+	/>
+{/if}
+
+{#if currentUser.isAuthenticated && isCanvasOwner}
+	<CanvasStylePicker
+		activeMode={overlayMode}
+		onchange={changeOverlayMode}
+		onpreview={(mode) => renderer?.setOverlayMode(mode)}
 	/>
 {/if}
 

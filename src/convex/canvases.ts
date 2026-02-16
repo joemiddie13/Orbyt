@@ -78,3 +78,21 @@ export const createSharedCanvas = mutation({
 		return canvasId;
 	},
 });
+
+/** Update the overlay mode for a canvas (owner only) */
+export const updateOverlayMode = mutation({
+	args: {
+		canvasId: v.id("canvases"),
+		overlayMode: v.union(v.literal("none"), v.literal("dots"), v.literal("lines")),
+	},
+	handler: async (ctx, args) => {
+		const user = await getAuthenticatedUser(ctx);
+
+		const canvas = await ctx.db.get(args.canvasId);
+		if (!canvas || canvas.ownerId !== user.uuid) {
+			throw new Error("Only the canvas owner can change overlay mode");
+		}
+
+		await ctx.db.patch(args.canvasId, { overlayMode: args.overlayMode });
+	},
+});

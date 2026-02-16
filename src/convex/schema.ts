@@ -24,7 +24,10 @@ export default defineSchema({
 			width: v.number(),
 			height: v.number(),
 		}),
-	}).index("by_owner", ["ownerId"]),
+		overlayMode: v.optional(v.union(v.literal("none"), v.literal("dots"), v.literal("lines"))),
+	})
+		.index("by_owner", ["ownerId"])
+		.index("by_owner_type", ["ownerId", "type"]),
 
 	canvasAccess: defineTable({
 		canvasId: v.id("canvases"),
