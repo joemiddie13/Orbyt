@@ -5,7 +5,7 @@
 	import { CanvasRenderer, type CanvasObjectData } from '$lib/canvas/CanvasRenderer';
 	import { useCurrentUser, initAuthService } from '$lib/auth';
 	import { PeerManager } from '$lib/webrtc';
-	import AuthModal from '$lib/components/AuthModal.svelte';
+	// LandingAuthCard removed — auth forms now live in toolbar dropdowns
 	import CanvasToolbar from '$lib/components/CanvasToolbar.svelte';
 	import CreateCanvasModal from '$lib/components/CreateCanvasModal.svelte';
 	import CreateBeaconModal from '$lib/components/CreateBeaconModal.svelte';
@@ -22,6 +22,8 @@
 	let canvasContainer: HTMLDivElement;
 	let renderer: CanvasRenderer;
 	let authSettled = $state(false);
+	let landingMode = $state(true);
+	let landingTransitionRunning = $state(false);
 
 	const client = useConvexClient();
 	const currentUser = useCurrentUser();
@@ -134,6 +136,22 @@
 		}
 	});
 
+	// Landing → authenticated transition: run the cinematic pulse, then load user's canvas
+	$effect(() => {
+		if (currentUser.isAuthenticated && landingMode && !landingTransitionRunning && renderer) {
+			handleAuthTransition();
+		}
+	});
+
+	async function handleAuthTransition() {
+		landingTransitionRunning = true;
+		// Run the cinematic exit — dissolve auth card, pulse rings, etc.
+		await renderer.exitLandingMode();
+		landingMode = false;
+		landingTransitionRunning = false;
+		// Existing effects will kick in to load the user's personal canvas
+	}
+
 	// Recovery: if auth exists but Astrophage user record is missing, create it
 	$effect(() => {
 		if (
@@ -152,9 +170,9 @@
 		}
 	});
 
-	// Backfill friend code for pre-Layer 3 users
+	// Backfill friend code for pre-Layer 3 users (skip during landing transition)
 	$effect(() => {
-		if (currentUser.isAuthenticated && currentUser.user?.uuid && !currentUser.user?.friendCode) {
+		if (currentUser.isAuthenticated && !landingMode && currentUser.user?.uuid && !currentUser.user?.friendCode) {
 			client.mutation(api.users.ensureFriendCode, {}).catch(() => {});
 		}
 	});
@@ -271,6 +289,14 @@
 
 		renderer = new CanvasRenderer();
 		await renderer.init(canvasContainer);
+
+		// If not already authenticated, enter landing mode
+		if (!currentUser.isAuthenticated) {
+			renderer.enterLandingMode();
+			overlayMode = 'dots';
+		} else {
+			landingMode = false;
+		}
 
 		// Wire up drag-start → WebRTC broadcast (lift animation on remote)
 		renderer.onObjectDragStart = (objectId) => {
@@ -820,9 +846,7 @@
 
 <div bind:this={canvasContainer} class="w-screen h-screen overflow-hidden"></div>
 
-{#if authSettled && !currentUser.isAuthenticated}
-	<AuthModal />
-{/if}
+<!-- Auth forms now live in toolbar dropdowns (AuthDropdown.svelte) -->
 
 {#if currentUser.isAuthenticated}
 	<CanvasToolbar
@@ -840,12 +864,34 @@
 		onCreateCanvas={() => { showCreateCanvas = true; }}
 		{webrtcConnected}
 	/>
+{:else if landingMode}
+	<CanvasToolbar
+		username="visitor"
+		canvasName="Orbyt"
+		isOwner={true}
+		showAccount={false}
+		onAuthSuccess={() => {/* Transition handled by $effect watching isAuthenticated */}}
+		onAddNote={() => {}}
+		onCreateBeacon={() => {}}
+		onAddPhoto={() => {}}
+		onAddMusic={() => {}}
+		activeCanvasId={null}
+		canvases={undefined}
+		onSelectCanvas={() => {}}
+		onCreateCanvas={() => {}}
+	/>
 {/if}
 
 {#if currentUser.isAuthenticated && isCanvasOwner}
 	<CanvasStylePicker
 		activeMode={overlayMode}
 		onchange={changeOverlayMode}
+		onpreview={(mode) => renderer?.setOverlayMode(mode)}
+	/>
+{:else if landingMode}
+	<CanvasStylePicker
+		activeMode={overlayMode}
+		onchange={(mode) => { overlayMode = mode; renderer?.setOverlayMode(mode); }}
 		onpreview={(mode) => renderer?.setOverlayMode(mode)}
 	/>
 {/if}

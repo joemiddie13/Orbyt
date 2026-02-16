@@ -1,4 +1,5 @@
 import { Container, type Application, type FederatedPointerEvent } from 'pixi.js';
+import { gsap } from '../gsapInit';
 
 /**
  * PanZoom — handles panning (click-drag to move around) and zooming (scroll
@@ -34,6 +35,16 @@ const RUBBER_BAND_FACTOR = 0.3;
 // How quickly the canvas springs back from the edge
 const SPRING_BACK_SPEED = 0.15;
 
+// 3D tactile: subtle depth effects during pan
+/** Scale bump when grabbing the canvas (1.0 = no change) */
+const GRAB_SCALE_BUMP = 1.012;
+/** Max tilt angle in radians during drag (~1.5 degrees) */
+const MAX_TILT = 0.026;
+/** How quickly tilt follows velocity (0 = none, 1 = instant) */
+const TILT_FOLLOW = 0.12;
+/** How quickly tilt springs back to zero on release */
+const TILT_SETTLE = 0.08;
+
 export class PanZoom {
 	private app: Application;
 	private world: Container;
@@ -51,6 +62,15 @@ export class PanZoom {
 	// Momentum state
 	private velocityX = 0;
 	private velocityY = 0;
+
+	// 3D tilt state
+	private tiltX = 0; // current rotation (from horizontal velocity)
+	private tiltY = 0; // current skew-like rotation (from vertical velocity)
+	private targetTiltX = 0;
+	private targetTiltY = 0;
+	/** The base scale before grab bump — used to restore after release */
+	private preGrabScale = 1;
+	private grabLifted = false;
 
 	// Stored listener for cleanup
 	private wheelListener: ((event: WheelEvent) => void) | null = null;
@@ -117,6 +137,22 @@ export class PanZoom {
 		this.isDragging = false;
 		this.velocityX = 0;
 		this.velocityY = 0;
+		// Reset 3D tilt so canvas doesn't stay skewed during editing
+		this.targetTiltX = 0;
+		this.targetTiltY = 0;
+		this.tiltX = 0;
+		this.tiltY = 0;
+		this.world.rotation = 0;
+		this.world.skew.set(0, 0);
+		if (this.grabLifted) {
+			this.grabLifted = false;
+			gsap.to(this.world.scale, {
+				x: this.preGrabScale,
+				y: this.preGrabScale,
+				duration: 0.2,
+				ease: 'power2.out',
+			});
+		}
 	}
 
 	/** Unlock pan/zoom interaction */
@@ -132,6 +168,18 @@ export class PanZoom {
 		// Kill any existing momentum when the user grabs the canvas
 		this.velocityX = 0;
 		this.velocityY = 0;
+
+		// 3D grab lift — subtle scale bump
+		if (!this.grabLifted) {
+			this.preGrabScale = this.world.scale.x;
+			this.grabLifted = true;
+			gsap.to(this.world.scale, {
+				x: this.preGrabScale * GRAB_SCALE_BUMP,
+				y: this.preGrabScale * GRAB_SCALE_BUMP,
+				duration: 0.2,
+				ease: 'power2.out',
+			});
+		}
 	}
 
 	private onDragMove(event: FederatedPointerEvent) {
@@ -144,6 +192,10 @@ export class PanZoom {
 		// Track velocity for momentum on release
 		this.velocityX = dx;
 		this.velocityY = dy;
+
+		// 3D tilt — target follows velocity direction (clamped)
+		this.targetTiltX = Math.max(-MAX_TILT, Math.min(MAX_TILT, -dy * 0.003));
+		this.targetTiltY = Math.max(-MAX_TILT, Math.min(MAX_TILT, dx * 0.003));
 
 		// Calculate the new position
 		let newX = this.world.x + dx;
@@ -176,6 +228,19 @@ export class PanZoom {
 	private onDragEnd() {
 		this.isDragging = false;
 		// Momentum continues in setupMomentum's ticker
+
+		// 3D settle — ease scale back and zero out tilt target
+		if (this.grabLifted) {
+			this.grabLifted = false;
+			gsap.to(this.world.scale, {
+				x: this.preGrabScale,
+				y: this.preGrabScale,
+				duration: 0.35,
+				ease: 'power2.out',
+			});
+		}
+		this.targetTiltX = 0;
+		this.targetTiltY = 0;
 	}
 
 	/**
@@ -221,6 +286,10 @@ export class PanZoom {
 			this.app.canvas.removeEventListener('wheel', this.wheelListener);
 			this.wheelListener = null;
 		}
+		// Reset any lingering tilt/skew
+		gsap.killTweensOf(this.world.scale);
+		this.world.rotation = 0;
+		this.world.skew.set(0, 0);
 	}
 
 	/**
@@ -232,6 +301,19 @@ export class PanZoom {
 	 */
 	private setupMomentum() {
 		this.app.ticker.add(() => {
+			// 3D tilt interpolation — runs even during drag
+			if (!this.locked) {
+				const tiltSpeed = this.isDragging ? TILT_FOLLOW : TILT_SETTLE;
+				this.tiltX += (this.targetTiltX - this.tiltX) * tiltSpeed;
+				this.tiltY += (this.targetTiltY - this.tiltY) * tiltSpeed;
+				// Snap to zero when close enough
+				if (Math.abs(this.tiltX) < 0.0001) this.tiltX = 0;
+				if (Math.abs(this.tiltY) < 0.0001) this.tiltY = 0;
+				// Apply tilt as rotation + skew (subtle perspective illusion)
+				this.world.rotation = this.tiltY * 0.5;
+				this.world.skew.set(this.tiltY * 0.3, this.tiltX * 0.3);
+			}
+
 			if (this.locked || this.isDragging) return;
 
 			const hasVelocity = Math.abs(this.velocityX) > VELOCITY_THRESHOLD

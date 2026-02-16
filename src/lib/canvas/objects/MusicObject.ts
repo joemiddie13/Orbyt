@@ -11,33 +11,33 @@ import { makeDraggable, makeLongPressable, makeTappable } from '../interactions/
  */
 
 // Card dimensions
-const CARD_WIDTH = 320;
-const CARD_HEIGHT = 110;
-const CARD_RADIUS = 14;
-const SHADOW_OFFSET = 3;
+const CARD_WIDTH = 400;
+const CARD_HEIGHT = 135;
+const CARD_RADIUS = 16;
+const SHADOW_OFFSET = 4;
 
 // Play button — far left
-const PLAY_CX = 26;
+const PLAY_CX = 32;
 const PLAY_CY = CARD_HEIGHT / 2;
-const PLAY_RADIUS = 17;
+const PLAY_RADIUS = 21;
 
 // Album art — right of play button
-const THUMB_LEFT = 52;
-const THUMB_SIZE = 70;
-const THUMB_RADIUS = 10;
+const THUMB_LEFT = 64;
+const THUMB_SIZE = 88;
+const THUMB_RADIUS = 12;
 const THUMB_CY = (CARD_HEIGHT - THUMB_SIZE) / 2;
 
 // Text — right of album art
-const TEXT_LEFT = THUMB_LEFT + THUMB_SIZE + 14;
-const TEXT_MAX_W = CARD_WIDTH - TEXT_LEFT - 24;
+const TEXT_LEFT = THUMB_LEFT + THUMB_SIZE + 16;
+const TEXT_MAX_W = CARD_WIDTH - TEXT_LEFT - 28;
 
 // Platform badge
-const BADGE_SIZE = 10;
+const BADGE_SIZE = 12;
 
 // Equalizer bar geometry
-const EQ_BAR_W = 4;
+const EQ_BAR_W = 5;
 const EQ_BAR_GAP = 3;
-const EQ_BAR_MAX_H = 18;
+const EQ_BAR_MAX_H = 22;
 const EQ_BAR_COUNT = 3;
 
 const PLATFORM_COLORS: Record<string, number> = {
@@ -176,7 +176,7 @@ export class MusicObject {
 		// ── Title ──────────────────────────────────────────────────────
 		const titleStyle = new TextStyle({
 			fontFamily: FONT_FAMILY,
-			fontSize: 18,
+			fontSize: 28,
 			fontWeight: 'bold',
 			fill: 0xffffff,
 			wordWrap: true,
@@ -184,20 +184,20 @@ export class MusicObject {
 		});
 		this.titleText = new Text({ text: content.title || 'Unknown', style: titleStyle });
 		this.titleText.x = TEXT_LEFT;
-		this.titleText.y = 20;
+		this.titleText.y = 18;
 		this.container.addChild(this.titleText);
 
 		// ── Artist ─────────────────────────────────────────────────────
 		const artistStyle = new TextStyle({
 			fontFamily: FONT_FAMILY,
-			fontSize: 14,
+			fontSize: 22,
 			fill: 0xffffff,
 			wordWrap: true,
 			wordWrapWidth: TEXT_MAX_W,
 		});
 		this.artistText = new Text({ text: content.artist || '', style: artistStyle });
 		this.artistText.x = TEXT_LEFT;
-		this.artistText.y = 46;
+		this.artistText.y = 52;
 		this.artistText.alpha = 0.6;
 		this.container.addChild(this.artistText);
 
@@ -211,12 +211,12 @@ export class MusicObject {
 			const platformLabel = PLATFORM_LABELS[content.platform] ?? content.platform;
 			const platformStyle = new TextStyle({
 				fontFamily: FONT_FAMILY,
-				fontSize: 12,
+				fontSize: 18,
 				fill: this.platformColor,
 			});
 			const platformText = new Text({ text: platformLabel, style: platformStyle });
 			platformText.x = TEXT_LEFT;
-			platformText.y = 76;
+			platformText.y = 92;
 			platformText.alpha = 0.8;
 			this.container.addChild(platformText);
 		}
@@ -230,9 +230,9 @@ export class MusicObject {
 		this.playBtn.addChild(playCircle);
 
 		const playTriangle = new Graphics();
-		playTriangle.moveTo(PLAY_CX - 5, PLAY_CY - 9);
-		playTriangle.lineTo(PLAY_CX - 5, PLAY_CY + 9);
-		playTriangle.lineTo(PLAY_CX + 8, PLAY_CY);
+		playTriangle.moveTo(PLAY_CX - 7, PLAY_CY - 11);
+		playTriangle.lineTo(PLAY_CX - 7, PLAY_CY + 11);
+		playTriangle.lineTo(PLAY_CX + 10, PLAY_CY);
 		playTriangle.closePath();
 		playTriangle.fill(0xffffff);
 		this.playBtn.addChild(playTriangle);

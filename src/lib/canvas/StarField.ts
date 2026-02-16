@@ -127,6 +127,21 @@ export class StarField {
 		this.drawAllLayers();
 	}
 
+	/** Temporarily boost all star layer alphas for a dramatic moment */
+	intensify(duration = 800) {
+		const durationSec = duration / 1000;
+		for (const layer of this.layers) {
+			gsap.to(layer, {
+				alpha: layer.alpha * 1.8,
+				duration: durationSec * 0.3,
+				ease: 'power2.out',
+				yoyo: true,
+				repeat: 1,
+				repeatDelay: durationSec * 0.4,
+			});
+		}
+	}
+
 	destroy() {
 		if (this.twinkleTween) {
 			this.twinkleTween.kill();

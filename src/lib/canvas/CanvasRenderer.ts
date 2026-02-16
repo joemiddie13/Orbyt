@@ -9,6 +9,8 @@ import { BeaconObject, type BeaconContent } from './objects/BeaconObject';
 import { StickerReaction, type StickerData } from './objects/StickerReaction';
 import { PhotoObject, type PhotoContent } from './objects/PhotoObject';
 import { MusicObject, type MusicContent } from './objects/MusicObject';
+import { AuthCardObject } from './objects/AuthCardObject';
+import { runTransition } from './LandingTransition';
 
 /**
  * CanvasRenderer — the core of Astrophage.
@@ -90,6 +92,12 @@ export class CanvasRenderer {
 
 	/** Persistent container for grid/dot overlay — stays at correct z-position */
 	private overlayLayer!: Container;
+
+	/** Landing mode: showcase objects (not Convex-backed) */
+	private landingObjects: Container[] = [];
+
+	/** Landing mode: the auth card object */
+	authCardObject: AuthCardObject | null = null;
 
 	/** Callback for when an object drag begins (movement confirmed) */
 	onObjectDragStart?: (objectId: string) => void;
@@ -205,7 +213,7 @@ export class CanvasRenderer {
 					existing.updateText(obj.content.text ?? '');
 					existing.updateColor(obj.content.color ?? 0xfff9c4);
 					existing.updateTitle(obj.content.title ?? '');
-					existing.updateSize(obj.size.w ?? 240, obj.size.h ?? 0);
+					existing.updateSize(obj.size.w ?? 300, obj.size.h ?? 0);
 				}
 
 				// Update expired state for beacons
@@ -227,7 +235,7 @@ export class CanvasRenderer {
 					objectId: obj._id,
 					editable: this.editable,
 					animate: shouldAnimate,
-					initialWidth: obj.size.w ?? 240,
+					initialWidth: obj.size.w ?? 300,
 					initialHeight: obj.size.h ?? 0,
 					onDragStart: (id) => this.onObjectDragStart?.(id),
 					onDragEnd: (id, x, y) => this.onObjectMoved?.(id, x, y),
@@ -238,7 +246,7 @@ export class CanvasRenderer {
 				}, title);
 				this.world.addChild(block.container);
 				this.objects.set(obj._id, block);
-				if (!this.editable) block.container.addChild(this.createStickerButton(obj._id, obj.size.w ?? 240));
+				if (!this.editable) block.container.addChild(this.createStickerButton(obj._id, obj.size.w ?? 300));
 				if (isBulkLoad) newContainers.push(block.container);
 			} else if (obj.type === 'beacon') {
 				const content = obj.content;
@@ -422,7 +430,7 @@ export class CanvasRenderer {
 	getMusicObjectRect(objectId: string): { worldX: number; worldY: number; w: number; h: number } | null {
 		const obj = this.objects.get(objectId);
 		if (!(obj instanceof MusicObject)) return null;
-		return { worldX: obj.container.x, worldY: obj.container.y, w: 320, h: 110 };
+		return { worldX: obj.container.x, worldY: obj.container.y, w: 400, h: 135 };
 	}
 
 	/** Hide/show a music object's PixiJS visuals (for iframe overlay) */
@@ -516,12 +524,12 @@ export class CanvasRenderer {
 		// Arrow pointer
 		const arrow = new Graphics();
 		arrow.moveTo(0, 0);
-		arrow.lineTo(0, 18);
-		arrow.lineTo(5, 14);
-		arrow.lineTo(10, 22);
-		arrow.lineTo(13, 20);
-		arrow.lineTo(8, 12);
-		arrow.lineTo(14, 10);
+		arrow.lineTo(0, 22);
+		arrow.lineTo(6, 17);
+		arrow.lineTo(12, 27);
+		arrow.lineTo(16, 24);
+		arrow.lineTo(10, 15);
+		arrow.lineTo(17, 12);
 		arrow.closePath();
 		arrow.fill(color);
 		arrow.stroke({ width: 1.5, color: 0xffffff });
@@ -529,11 +537,11 @@ export class CanvasRenderer {
 
 		// Username label pill (shared style — one instance across all cursors)
 		const label = new Text({ text: username, style: CURSOR_LABEL_STYLE });
-		label.x = 16;
-		label.y = 16;
+		label.x = 19;
+		label.y = 19;
 
 		const pill = new Graphics();
-		pill.roundRect(12, 13, label.width + 10, 18, 9);
+		pill.roundRect(15, 16, label.width + 12, 22, 11);
 		pill.fill({ color, alpha: 0.9 });
 		container.addChild(pill);
 		container.addChild(label);
@@ -660,7 +668,7 @@ export class CanvasRenderer {
 		if (mode === 'dots') {
 			for (let x = MARGIN; x <= this.canvasWidth - MARGIN; x += GRID) {
 				for (let y = MARGIN; y <= this.canvasHeight - MARGIN; y += GRID) {
-					g.circle(x, y, 2.5);
+					g.circle(x, y, 3);
 				}
 			}
 			g.fill({ color: COLOR, alpha: 0.35 });
@@ -695,11 +703,11 @@ export class CanvasRenderer {
 			{ type: 'eyes', emoji: '\uD83D\uDC40' },
 		];
 
-		const SIZE = 30;
+		const SIZE = 36;
 		const HALF = SIZE / 2;
-		const SLOT = 34;        // width per emoji slot
-		const PAD = 10;         // padding inside menu bar ends
-		const MENU_GAP = 4;     // gap between trigger circle and menu bar
+		const SLOT = 40;        // width per emoji slot
+		const PAD = 12;         // padding inside menu bar ends
+		const MENU_GAP = 5;     // gap between trigger circle and menu bar
 
 		const BAR_W = PAD * 2 + STICKERS.length * SLOT;  // total bar width
 		const BAR_H = SLOT;                                // bar height
@@ -789,7 +797,7 @@ export class CanvasRenderer {
 
 		const triggerEmoji = new Text({
 			text: '\uD83D\uDC40',
-			style: new TextStyle({ fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif' }),
+			style: new TextStyle({ fontSize: 24, fontFamily: 'system-ui, -apple-system, sans-serif' }),
 		});
 		triggerEmoji.anchor.set(0.5, 0.5);
 		triggerEmoji.y = -1;
@@ -819,7 +827,7 @@ export class CanvasRenderer {
 
 			const optEmoji = new Text({
 				text: sticker.emoji,
-				style: new TextStyle({ fontSize: 16, fontFamily: 'system-ui, -apple-system, sans-serif' }),
+				style: new TextStyle({ fontSize: 24, fontFamily: 'system-ui, -apple-system, sans-serif' }),
 			});
 			optEmoji.anchor.set(0.5, 0.5);
 			optEmoji.y = -1;
@@ -975,7 +983,201 @@ export class CanvasRenderer {
 		return btn;
 	}
 
+	/**
+	 * Enter landing mode — creates showcase objects + auth card for unauthenticated visitors.
+	 * These objects are NOT Convex-backed and live only during the landing experience.
+	 */
+	enterLandingMode() {
+		// Helper to add a landing object
+		const add = (container: Container) => {
+			this.world.addChild(container);
+			this.landingObjects.push(container);
+		};
+
+		// ── TOP-LEFT: Notes showcase ─────────────────────────────────────
+		const noteOpts = (w: number) => ({
+			editable: true,
+			animate: true,
+			initialWidth: w,
+			initialHeight: 0,
+		});
+
+		add(new TextBlock(
+			'<p>No feeds. No algorithms. Just a canvas for your people.</p>',
+			120, 120, 0xfff9c4, noteOpts(380), '\u2728 Welcome to Orbyt',
+		).container);
+
+		add(new TextBlock(
+			'<p>Write notes to your friends. <strong>Bold</strong>, <em>italic</em>, headings — make it yours.</p>',
+			560, 140, 0xc8e6c9, noteOpts(360), '\u270d\ufe0f Rich Text',
+		).container);
+
+		add(new TextBlock(
+			'<ul><li>Project Hail Mary</li><li>BUGONIA</li><li>One Battle After Another</li></ul>',
+			140, 480, 0xbbdefb, noteOpts(340), '\ud83c\udfac Movie Watchlist',
+		).container);
+
+		add(new TextBlock(
+			'<p>Drag notes anywhere. Resize them. Pick a color. This is your space — organize it how you want.</p>',
+			520, 520, 0xf8bbd0, noteOpts(380), '\ud83c\udfa8 Your Canvas',
+		).container);
+
+		add(new TextBlock(
+			'<p>Spirited Away, The Grand Budapest Hotel, Moonlight</p>',
+			920, 280, 0xffe0b2, noteOpts(340), '\ud83c\udf1f Movie Night Picks',
+		).container);
+
+		// ── TOP-RIGHT: Beacons showcase ──────────────────────────────────
+		const beaconBase = {
+			editable: true,
+			animate: true,
+		};
+
+		add(new BeaconObject({
+			title: 'Friday Hangout',
+			description: 'Pull up!',
+			startTime: Date.now() + 3600000,
+			endTime: Date.now() + 7200000,
+			visibilityType: 'canvas',
+			locationAddress: 'The usual spot',
+		}, 1900, 120, beaconBase).container);
+
+		add(new BeaconObject({
+			title: 'Park Run',
+			description: '5K Saturday morning',
+			startTime: Date.now() + 86400000,
+			endTime: Date.now() + 86400000 + 3600000,
+			visibilityType: 'canvas',
+			locationAddress: 'Prospect Park',
+		}, 2350, 160, beaconBase).container);
+
+		add(new BeaconObject({
+			title: 'Game Night',
+			description: 'Bring snacks',
+			startTime: Date.now() + 172800000,
+			endTime: Date.now() + 172800000 + 10800000,
+			visibilityType: 'direct',
+			fromUsername: 'brandon',
+		}, 2050, 500, { ...beaconBase, isDirect: true }).container);
+
+		// Beacon explainer note
+		add(new TextBlock(
+			'<p>Beacons are spontaneous or planned hangouts. They pulse with life and expire when the moment passes.</p>',
+			1900, 840, 0xffe0b2, noteOpts(380), '\ud83d\udd25 Beacons',
+		).container);
+
+		// ── BOTTOM-LEFT: Photos showcase ─────────────────────────────────
+		// Placeholder Polaroids — gray placeholders until real images are provided
+		add(new PhotoObject({
+			storageId: 'demo-1',
+			caption: 'Summer vibes',
+			rotation: -3,
+		}, 150, 1150, { editable: true, animate: true }).container);
+
+		add(new PhotoObject({
+			storageId: 'demo-2',
+			caption: 'Taco Tuesday',
+			rotation: 2,
+		}, 520, 1200, { editable: true, animate: true }).container);
+
+		add(new PhotoObject({
+			storageId: 'demo-3',
+			caption: 'Rocko at the park',
+			rotation: -1,
+		}, 880, 1120, { editable: true, animate: true }).container);
+
+		// Photo explainer note
+		add(new TextBlock(
+			'<p>Drop photos right on the canvas. Polaroid style — with captions and a little tilt.</p>',
+			200, 1650, 0xe1bee7, noteOpts(380), '\ud83d\udcf8 Photos',
+		).container);
+
+		// ── BOTTOM-RIGHT: Music showcase ─────────────────────────────────
+		add(new MusicObject({
+			url: 'https://open.spotify.com/track/demo1',
+			platform: 'spotify',
+			title: 'Redbone',
+			artist: 'Childish Gambino',
+			embedUrl: '',
+		}, 1900, 1150, { editable: true, animate: true }).container);
+
+		add(new MusicObject({
+			url: 'https://music.youtube.com/watch?v=demo2',
+			platform: 'youtube-music',
+			title: 'Electric Feel',
+			artist: 'MGMT',
+			embedUrl: '',
+		}, 1950, 1340, { editable: true, animate: true }).container);
+
+		add(new MusicObject({
+			url: 'https://music.apple.com/demo3',
+			platform: 'apple-music',
+			title: 'Best Part',
+			artist: 'Daniel Caesar ft. H.E.R.',
+			embedUrl: '',
+		}, 2000, 1530, { editable: true, animate: true }).container);
+
+		// Music explainer note
+		add(new TextBlock(
+			'<p>Share music from Spotify, YouTube, or Apple Music. It plays right on the canvas.</p>',
+			2420, 1200, 0xb2dfdb, noteOpts(380), '\ud83c\udfb5 Music',
+		).container);
+
+		// ── CENTER: Auth card ────────────────────────────────────────────
+		this.authCardObject = new AuthCardObject(1190, 720);
+		add(this.authCardObject.container);
+
+		// Set dot matrix overlay as default for landing
+		this.setOverlayMode('dots');
+	}
+
+	/**
+	 * Exit landing mode — run the cinematic transition, then clean up.
+	 * Returns a promise that resolves when the main transition is done
+	 * and the caller should start loading user objects.
+	 */
+	async exitLandingMode(): Promise<void> {
+		if (!this.authCardObject) return;
+
+		// Get epicenter from auth card position
+		const cardBounds = this.authCardObject.getCardBounds();
+		const epicenterX = this.authCardObject.container.x + cardBounds.width / 2;
+		const epicenterY = this.authCardObject.container.y + cardBounds.height / 2;
+
+		// Dissolve auth card first
+		await this.authCardObject.dissolve();
+
+		// Run the cinematic pulse transition
+		await runTransition(this, epicenterX, epicenterY, this.landingObjects);
+
+		// Clean up all landing objects
+		for (const obj of this.landingObjects) {
+			if (obj.parent) {
+				this.world.removeChild(obj);
+			}
+			obj.destroy({ children: true });
+		}
+		this.landingObjects = [];
+
+		// Clean up auth card reference
+		if (this.authCardObject) {
+			this.authCardObject.destroy();
+			this.authCardObject = null;
+		}
+	}
+
 	destroy() {
+		// Clean up landing objects if still active
+		for (const obj of this.landingObjects) {
+			if (obj.parent) this.world.removeChild(obj);
+			obj.destroy({ children: true });
+		}
+		this.landingObjects = [];
+		if (this.authCardObject) {
+			this.authCardObject.destroy();
+			this.authCardObject = null;
+		}
+
 		this.removeAllRemoteCursors();
 		this.panZoom.destroy();
 		this.starField.destroy();

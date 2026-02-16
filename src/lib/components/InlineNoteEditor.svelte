@@ -285,12 +285,12 @@
 	.inline-title-input {
 		display: block;
 		width: 100%;
-		padding: 12px 16px 0 16px;
+		padding: 14px 20px 0 20px;
 		border: none;
 		outline: none;
 		background: transparent;
 		font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
-		font-size: 1.125rem;
+		font-size: 1.75rem;
 		font-weight: 700;
 		color: #292524;
 		line-height: 1.4;
@@ -303,27 +303,27 @@
 
 	.inline-editor :global(.ProseMirror) {
 		outline: none;
-		padding: 16px;
-		min-height: 60px;
-		font-size: 0.875rem;
+		padding: 20px;
+		min-height: 80px;
+		font-size: 1.375rem;
 		line-height: 1.625;
 		color: #292524;
 	}
 
 	.inline-editor :global(.ProseMirror h1) {
-		font-size: 1.5rem;
+		font-size: 2.375rem;
 		font-weight: 700;
 		margin: 0.25rem 0;
 	}
 
 	.inline-editor :global(.ProseMirror h2) {
-		font-size: 1.25rem;
+		font-size: 1.875rem;
 		font-weight: 700;
 		margin: 0.25rem 0;
 	}
 
 	.inline-editor :global(.ProseMirror h3) {
-		font-size: 1.1rem;
+		font-size: 1.75rem;
 		font-weight: 700;
 		margin: 0.25rem 0;
 	}

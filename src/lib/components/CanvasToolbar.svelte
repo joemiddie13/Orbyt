@@ -5,6 +5,7 @@
 	import CanvasSwitcher from './CanvasSwitcher.svelte';
 	import FriendCodeModal from './FriendCodeModal.svelte';
 	import FriendsList from './FriendsList.svelte';
+	import AuthDropdown from './AuthDropdown.svelte';
 
 	let {
 		username,
@@ -20,6 +21,8 @@
 		onSelectCanvas,
 		onCreateCanvas,
 		webrtcConnected = false,
+		showAccount = true,
+		onAuthSuccess = undefined,
 	}: {
 		username: string;
 		canvasName?: string;
@@ -34,6 +37,10 @@
 		onSelectCanvas: (canvasId: string, canvasName: string) => void;
 		onCreateCanvas: () => void;
 		webrtcConnected?: boolean;
+		/** Hide sign out, friend code, friends list (landing page) */
+		showAccount?: boolean;
+		/** Auth success callback (landing page dropdowns) */
+		onAuthSuccess?: () => void;
 	} = $props();
 
 	let isSigningOut = $state(false);
@@ -275,19 +282,26 @@
 		</button>
 	{/if}
 
-	<div class="w-px h-5 bg-white/10"></div>
+	{#if showAccount}
+		<div class="w-px h-5 bg-white/10"></div>
 
-	<!-- Friend code dropdown -->
-	<FriendCodeModal {friendCode} />
+		<!-- Friend code dropdown -->
+		<FriendCodeModal {friendCode} />
 
-	<!-- Friends list dropdown -->
-	<FriendsList />
+		<!-- Friends list dropdown -->
+		<FriendsList />
 
-	<button
-		onclick={handleSignOut}
-		disabled={isSigningOut}
-		class="lego-btn lego-btn-sm lego-neutral"
-	>
-		Sign out
-	</button>
+		<button
+			onclick={handleSignOut}
+			disabled={isSigningOut}
+			class="lego-btn lego-btn-sm lego-neutral"
+		>
+			Sign out
+		</button>
+	{:else}
+		<div class="w-px h-5 bg-white/10"></div>
+
+		<AuthDropdown initialMode="signin" onAuthSuccess={onAuthSuccess} />
+		<AuthDropdown initialMode="signup" onAuthSuccess={onAuthSuccess} />
+	{/if}
 </div>

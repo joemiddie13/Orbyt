@@ -9,6 +9,7 @@
  */
 
 import type * as access from "../access.js";
+import type * as ai from "../ai.js";
 import type * as auth from "../auth.js";
 import type * as beacons from "../beacons.js";
 import type * as canvases from "../canvases.js";
@@ -33,6 +34,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   access: typeof access;
+  ai: typeof ai;
   auth: typeof auth;
   beacons: typeof beacons;
   canvases: typeof canvases;

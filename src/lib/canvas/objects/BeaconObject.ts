@@ -14,9 +14,9 @@ import { makeDraggable, makeLongPressable, makeTappable } from '../interactions/
  * antenna, and layered ambient glow. Expired beacons dim and go silent.
  */
 
-const BEACON_WIDTH = 260;
-const BEACON_PADDING = 16;
-const CORNER_RADIUS = 16;
+const BEACON_WIDTH = 320;
+const BEACON_PADDING = 20;
+const CORNER_RADIUS = 18;
 const BEACON_COLOR = 0xFFA726;
 const DIRECT_BEACON_COLOR = 0x26A69A;
 
@@ -28,8 +28,8 @@ const RIPPLE_MAX_ALIVE = 3;
 const HEARTBEAT_REPEAT_DELAY = 1.8;
 
 // Halftone display — sprites whose SCALE varies with signal intensity
-const HALFTONE_CELL = 22;
-const HALFTONE_TEX_SIZE = 32;
+const HALFTONE_CELL = 26;
+const HALFTONE_TEX_SIZE = 36;
 
 /** Shared white circle texture — created once, used by all beacon dot sprites */
 let _circleTexture: Texture | null = null;
@@ -205,9 +205,9 @@ export class BeaconObject {
 
 		// --- Layer 6: Signal dot (antenna at top center) ---
 		this.signalDot = new Graphics();
-		this.signalDot.circle(0, 0, 5);
+		this.signalDot.circle(0, 0, 6);
 		this.signalDot.fill({ color: 0xffffff, alpha: 0.9 });
-		this.signalDot.circle(0, 0, 2.5);
+		this.signalDot.circle(0, 0, 3);
 		this.signalDot.fill(this.baseColor);
 		this.signalDot.x = BEACON_WIDTH / 2;
 		this.signalDot.y = -3;
@@ -217,12 +217,12 @@ export class BeaconObject {
 		// --- Layer 7: Text content ---
 		const titleStyle = new TextStyle({
 			fontFamily: FONT_FAMILY,
-			fontSize: 22,
+			fontSize: 32,
 			fontWeight: 'bold',
 			fill: 0xffffff,
 			wordWrap: true,
 			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2 - 28,
-			lineHeight: 28,
+			lineHeight: 40,
 		});
 		const titleText = new Text({ text: content.title, style: titleStyle });
 		titleText.x = BEACON_PADDING + 24;
@@ -231,9 +231,9 @@ export class BeaconObject {
 
 		// Pin icon — bright on dark background
 		const pin = new Graphics();
-		pin.circle(BEACON_PADDING + 8, BEACON_PADDING + 10, 7);
+		pin.circle(BEACON_PADDING + 10, BEACON_PADDING + 12, 8);
 		pin.fill(0xffffff);
-		pin.circle(BEACON_PADDING + 8, BEACON_PADDING + 10, 2.5);
+		pin.circle(BEACON_PADDING + 10, BEACON_PADDING + 12, 3);
 		pin.fill(this.baseColor);
 		this.container.addChild(pin);
 
@@ -241,7 +241,7 @@ export class BeaconObject {
 		const timeStr = this.formatTimeRange(content.startTime, content.endTime);
 		const timeStyle = new TextStyle({
 			fontFamily: FONT_FAMILY,
-			fontSize: 16,
+			fontSize: 22,
 			fill: 0xffffff,
 			wordWrap: true,
 			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
@@ -256,7 +256,7 @@ export class BeaconObject {
 		if (isDirect && content.fromUsername) {
 			const fromStyle = new TextStyle({
 				fontFamily: FONT_FAMILY,
-				fontSize: 15,
+				fontSize: 22,
 				fill: 0xffffff,
 			});
 			const fromText = new Text({ text: `From ${content.fromUsername}`, style: fromStyle });
@@ -270,7 +270,7 @@ export class BeaconObject {
 		if (content.locationAddress) {
 			const locStyle = new TextStyle({
 				fontFamily: FONT_FAMILY,
-				fontSize: 15,
+				fontSize: 22,
 				fill: 0xffffff,
 				wordWrap: true,
 				wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
@@ -287,7 +287,7 @@ export class BeaconObject {
 			this.container.alpha = 0.3;
 			const expStyle = new TextStyle({
 				fontFamily: FONT_FAMILY,
-				fontSize: 15,
+				fontSize: 22,
 				fontWeight: 'bold',
 				fill: 0xffffff,
 			});
@@ -677,8 +677,8 @@ export class BeaconObject {
 
 		this.responseDots.clear();
 		this.responseDots.visible = true;
-		const dotSize = 5;
-		const gap = 3;
+		const dotSize = 6;
+		const gap = 4;
 		let xPos = BEACON_WIDTH - BEACON_PADDING;
 
 		for (let i = Math.min(responses.length, 8) - 1; i >= 0; i--) {
@@ -695,7 +695,7 @@ export class BeaconObject {
 		let h = BEACON_PADDING * 2 + 20 + 18; // padding + title line + time line
 		if (content.locationAddress) h += 18;
 		if (content.visibilityType === 'direct' && content.fromUsername) h += 18;
-		return Math.max(h, 80);
+		return Math.max(h, 100);
 	}
 
 	private formatTimeRange(start: number, end: number): string {

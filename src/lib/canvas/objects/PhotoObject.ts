@@ -14,14 +14,14 @@ import { makeDraggable, makeLongPressable, makeTappable, animateDragLift, animat
  * Frame adapts to the image dimensions once loaded.
  */
 
-const FRAME_PADDING = 12;
-const BOTTOM_PADDING = 48;
-const CORNER_RADIUS = 4;
-const SHADOW_OFFSET = 4;
-const MAX_IMAGE_WIDTH = 260;
-const MAX_IMAGE_HEIGHT = 360;
-const DEFAULT_IMAGE_WIDTH = 236;
-const DEFAULT_IMAGE_HEIGHT = 236;
+const FRAME_PADDING = 16;
+const BOTTOM_PADDING = 56;
+const CORNER_RADIUS = 5;
+const SHADOW_OFFSET = 5;
+const MAX_IMAGE_WIDTH = 320;
+const MAX_IMAGE_HEIGHT = 440;
+const DEFAULT_IMAGE_WIDTH = 290;
+const DEFAULT_IMAGE_HEIGHT = 290;
 
 export interface PhotoContent {
 	storageId: string;
@@ -196,7 +196,7 @@ export class PhotoObject {
 	private addCaption(text: string) {
 		const style = new TextStyle({
 			fontFamily: FONT_FAMILY,
-			fontSize: 14,
+			fontSize: 22,
 			fill: 0x333333,
 			wordWrap: true,
 			wordWrapWidth: this.imageWidth,

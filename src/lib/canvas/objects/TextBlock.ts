@@ -14,14 +14,14 @@ import { makeDraggable, makeLongPressable, makeTappable, animateDragLift, animat
  * Left/top resize adjusts position to keep the opposite edge fixed.
  */
 
-const PADDING = 16;
-const CORNER_RADIUS = 12;
-const DEFAULT_WIDTH = 240;
-const MIN_WIDTH = 160;
-const MAX_WIDTH = 600;
-const MIN_HEIGHT = 60;
+const PADDING = 20;
+const CORNER_RADIUS = 14;
+const DEFAULT_WIDTH = 300;
+const MIN_WIDTH = 200;
+const MAX_WIDTH = 800;
+const MIN_HEIGHT = 80;
 const MAX_HEIGHT = 1200;
-const HANDLE_SIZE = 16;
+const HANDLE_SIZE = 18;
 
 /** Resize zone half-width (extends inside AND outside the note edge) */
 const EDGE_ZONE = 6;
@@ -116,24 +116,26 @@ export class TextBlock {
 		// HTMLTextStyle with tagStyles for rich text rendering
 		this.style = new HTMLTextStyle({
 			fontFamily: FONT_FAMILY,
-			fontSize: 16,
+			fontSize: 26,
 			fill: 0x2d2d2d,
 			wordWrap: true,
 			wordWrapWidth: this.blockWidth - PADDING * 2,
-			lineHeight: 22,
-			padding: 20,
+			lineHeight: 36,
+			padding: 4,
 			tagStyles: {
-				h1: { fontSize: 24, fontWeight: 'bold' },
-				h2: { fontSize: 20, fontWeight: 'bold' },
-				h3: { fontSize: 18, fontWeight: 'bold' },
+				h1: { fontSize: 38, fontWeight: 'bold' },
+				h2: { fontSize: 30, fontWeight: 'bold' },
+				h3: { fontSize: 28, fontWeight: 'bold' },
 				strong: { fontWeight: 'bold' },
 				em: { fontStyle: 'italic' },
 			},
 			cssOverrides: [
-				'ul { padding-left: 20px; list-style-type: disc; }',
-				'ol { padding-left: 20px; list-style-type: decimal; }',
-				'li { margin-bottom: 2px; }',
-				'p { margin: 2px 0; }',
+				'box-sizing: content-box',
+				'overflow-wrap: break-word',
+				'ul { padding-left: 28px; list-style-type: disc; box-sizing: content-box; }',
+				'ol { padding-left: 28px; list-style-type: decimal; box-sizing: content-box; }',
+				'li { margin-bottom: 4px; box-sizing: content-box; }',
+				'p { margin: 4px 0; }',
 			],
 		});
 
@@ -148,7 +150,7 @@ export class TextBlock {
 				text: title,
 				style: new TextStyle({
 					fontFamily: FONT_FAMILY,
-					fontSize: 18,
+					fontSize: 28,
 					fontWeight: 'bold',
 					fill: 0x2d2d2d,
 					wordWrap: true,
@@ -276,7 +278,7 @@ export class TextBlock {
 					text: title,
 					style: new TextStyle({
 						fontFamily: FONT_FAMILY,
-						fontSize: 18,
+						fontSize: 28,
 						fontWeight: 'bold',
 						fill: 0x2d2d2d,
 						wordWrap: true,
@@ -345,8 +347,9 @@ export class TextBlock {
 			cancelAnimationFrame(this.pendingRAF);
 			this.pendingRAF = null;
 		}
-		let remaining = 5;
+		let remaining = 12;
 		let lastHeight = -1;
+		let settled = 0; // consecutive frames with identical height
 		const check = () => {
 			this.pendingRAF = null;
 			if (!this.container.parent) return; // destroyed
@@ -362,13 +365,18 @@ export class TextBlock {
 				this.updateResizeZones();
 			}
 			remaining--;
-			// Exit early if height stabilized (same as last frame)
+			// Only consider stable after 3 consecutive identical frames —
+			// prevents false "stable" at MIN_HEIGHT before HTMLText measures
 			if (needed === lastHeight) {
-				// Final sync — ensure background matches even if height didn't change
-				this.background.clear();
-				this.drawBackground(this.currentColor);
-				this.updateResizeZones();
-				return;
+				settled++;
+				if (settled >= 3) {
+					this.background.clear();
+					this.drawBackground(this.currentColor);
+					this.updateResizeZones();
+					return;
+				}
+			} else {
+				settled = 0;
 			}
 			lastHeight = needed;
 			if (remaining > 0) {
@@ -376,6 +384,22 @@ export class TextBlock {
 			}
 		};
 		this.pendingRAF = requestAnimationFrame(check);
+
+		// Safety net: HTMLText can be slow with complex content (lists, headings).
+		// Run a final measurement after 500ms regardless of RAF outcome.
+		setTimeout(() => {
+			if (!this.container.parent) return;
+			const titleHeight = this.titleDisplay ? this.titleDisplay.height + TextBlock.TITLE_GAP : 0;
+			this.textDisplay.y = PADDING + titleHeight;
+			const textFitHeight = this.textDisplay.height + titleHeight + PADDING * 2;
+			const needed = Math.max(MIN_HEIGHT, textFitHeight, this.userHeight);
+			if (Math.abs(needed - this.blockHeight) > 1) {
+				this.blockHeight = needed;
+				this.background.clear();
+				this.drawBackground(this.currentColor);
+				this.updateResizeZones();
+			}
+		}, 500);
 	}
 
 	private drawBackground(color: number) {
