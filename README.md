@@ -217,6 +217,11 @@ Orbyt is open source and contributions are welcome. If you're interested in help
 - **Pull requests** — Fork the repo, make your changes, and open a PR
 - **Discussion** — Have thoughts on the philosophy, roadmap, or design? Open an issue — we'd love to hear from you
 
+## Contact
+
+- **Email** — [joe@orbyt.life](mailto:joe@orbyt.life)
+- **X** — [@joemiddie13](https://x.com/joemiddie13)
+
 ## License
 
 Open source — [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).

@@ -39,6 +39,10 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
 	return betterAuth({
 		baseURL: siteUrl,
 		database: authComponent.adapter(ctx),
+		trustedOrigins: [
+			"http://localhost:5173",
+			"https://orbyt.life",
+		],
 		emailAndPassword: {
 			enabled: true,
 			requireEmailVerification: false,
