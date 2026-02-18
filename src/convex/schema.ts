@@ -37,6 +37,7 @@ export default defineSchema({
 		role: v.union(v.literal("owner"), v.literal("member"), v.literal("viewer")),
 		invitedBy: v.string(), // UUID
 		invitedAt: v.number(),
+		lastAccessedAt: v.optional(v.number()),
 	})
 		.index("by_canvas", ["canvasId"])
 		.index("by_user", ["userId"])

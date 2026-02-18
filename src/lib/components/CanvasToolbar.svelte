@@ -23,6 +23,7 @@
 		canvases,
 		onSelectCanvas,
 		onCreateCanvas,
+		onSettingsCanvas,
 		webrtcConnected = false,
 		showAccount = true,
 		onAuthSuccess = undefined,
@@ -43,6 +44,7 @@
 		canvases: any[] | undefined;
 		onSelectCanvas: (canvasId: string, canvasName: string) => void;
 		onCreateCanvas: () => void;
+		onSettingsCanvas?: (canvasId: string, canvasName: string) => void;
 		webrtcConnected?: boolean;
 		/** Hide sign out, friend code, friends list (landing page) */
 		showAccount?: boolean;
@@ -312,9 +314,10 @@
 	<CanvasSwitcher
 		{activeCanvasId}
 		{canvases}
-		canvasName={canvasName ?? 'My Canvas'}
+		canvasName={canvasName ?? 'My Orbyt'}
 		onSelect={onSelectCanvas}
 		onCreateNew={onCreateCanvas}
+		onSettings={onSettingsCanvas}
 		{activeBeaconCanvasIds}
 	/>
 

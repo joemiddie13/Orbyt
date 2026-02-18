@@ -5,9 +5,10 @@
 	let {
 		activeCanvasId,
 		canvases,
-		canvasName = 'My Canvas',
+		canvasName = 'My Orbyt',
 		onSelect,
 		onCreateNew,
+		onSettings,
 		activeBeaconCanvasIds = [],
 	}: {
 		activeCanvasId: string | null;
@@ -15,10 +16,42 @@
 		canvasName?: string;
 		onSelect: (canvasId: string, canvasName: string) => void;
 		onCreateNew: () => void;
+		onSettings?: (canvasId: string, canvasName: string) => void;
 		activeBeaconCanvasIds?: string[];
 	} = $props();
 
 	const beaconCanvasSet = $derived(new Set(activeBeaconCanvasIds));
+
+	// Sort: personal first → beacons → recently visited → alphabetical
+	const sortedCanvases = $derived.by(() => {
+		if (!canvases) return [];
+		return [...canvases].sort((a, b) => {
+			// Personal Orbyt always first
+			const aPersonal = a.type === 'personal' && a.role === 'owner' ? 1 : 0;
+			const bPersonal = b.type === 'personal' && b.role === 'owner' ? 1 : 0;
+			if (aPersonal !== bPersonal) return bPersonal - aPersonal;
+			// Active beacons next
+			const aBeacon = beaconCanvasSet.has(a._id) ? 1 : 0;
+			const bBeacon = beaconCanvasSet.has(b._id) ? 1 : 0;
+			if (aBeacon !== bBeacon) return bBeacon - aBeacon;
+			// Most recently visited
+			const aTime = a.lastAccessedAt ?? 0;
+			const bTime = b.lastAccessedAt ?? 0;
+			if (aTime !== bTime) return bTime - aTime;
+			// Alphabetical fallback
+			return a.name.localeCompare(b.name);
+		});
+	});
+
+	// Search filter — only shows when 8+ canvases
+	let searchQuery = $state('');
+	let searchInput = $state<HTMLInputElement>(undefined!);
+	const showSearch = $derived((canvases?.length ?? 0) >= 8);
+	const filteredCanvases = $derived.by(() => {
+		if (!searchQuery.trim()) return sortedCanvases;
+		const q = searchQuery.toLowerCase().trim();
+		return sortedCanvases.filter((c) => c.name.toLowerCase().includes(q));
+	});
 
 	let open = $state(false);
 	let popover = $state<HTMLDivElement>(undefined!);
@@ -39,11 +72,15 @@
 				if (chevron) {
 					gsap.to(chevron, { rotation: 180, duration: 0.2, ease: 'power2.out' });
 				}
+				if (showSearch && searchInput) {
+					searchInput.focus();
+				}
 			});
 		}
 	}
 
 	function close() {
+		searchQuery = '';
 		if (!open || !popover) { open = false; return; }
 		gsap.to(popover, {
 			scale: 0.6, opacity: 0, duration: 0.15, ease: 'power2.in',
@@ -109,36 +146,63 @@
 
 	{#if open}
 		<div bind:this={popover} class="switcher-popover">
+			{#if showSearch}
+				<div class="switcher-search">
+					<input
+						bind:this={searchInput}
+						bind:value={searchQuery}
+						type="text"
+						placeholder="Search Orbyts..."
+						class="search-input"
+					/>
+				</div>
+			{/if}
 			<div class="switcher-list">
-				{#if canvases}
-					{#each canvases as canvas}
-						<button
-							onclick={() => select(canvas._id, canvas.name)}
-							class="canvas-item"
-							class:active={canvas._id === activeCanvasId}
-							class:has-beacon={beaconCanvasSet.has(canvas._id)}
-						>
-							<span class="canvas-icon">
-								{#if canvas.type === 'personal'}🏠{:else}👥{/if}
-							</span>
-							<span class="canvas-name">{canvas.name}</span>
-							{#if beaconCanvasSet.has(canvas._id)}
-								<svg class="beacon-icon" width="14" height="14" viewBox="0 0 20 20" fill="none">
-									<circle cx="10" cy="14" r="2" fill="#f5a623" opacity="0.95"/>
-									<path d="M6.5 10 A5 5 0 0 1 13.5 10" stroke="#f5a623" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.7"/>
-									<path d="M4 7 A8 8 0 0 1 16 7" stroke="#f5a623" stroke-width="1.3" stroke-linecap="round" fill="none" opacity="0.4"/>
+				{#each filteredCanvases as canvas}
+					<button
+						onclick={() => select(canvas._id, canvas.name)}
+						class="canvas-item"
+						class:active={canvas._id === activeCanvasId}
+						class:has-beacon={beaconCanvasSet.has(canvas._id)}
+					>
+						<span class="canvas-icon">
+							{#if canvas.type === 'personal'}🏠{:else}👥{/if}
+						</span>
+						<span class="canvas-name">{canvas.name}</span>
+						{#if onSettings && canvas.type === 'shared' && canvas.role === 'owner'}
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<span
+								role="button"
+								tabindex="-1"
+								onclick={(e) => { e.stopPropagation(); onSettings(canvas._id, canvas.name); close(); }}
+								onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onSettings(canvas._id, canvas.name); close(); } }}
+								class="settings-btn"
+								title="Orbyt settings"
+							>
+								<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+									<path d="M11.5 1h-3l-.4 2.4a6.5 6.5 0 00-1.8 1l-2.3-.8L2.4 6.2l1.5 1.9a6.5 6.5 0 000 2l-1.5 1.9 1.6 2.6 2.3-.8a6.5 6.5 0 001.8 1L8.5 17h3l.4-2.4a6.5 6.5 0 001.8-1l2.3.8 1.6-2.6-1.5-1.9a6.5 6.5 0 000-2l1.5-1.9-1.6-2.6-2.3.8a6.5 6.5 0 00-1.8-1L11.5 1zM10 13a3 3 0 110-6 3 3 0 010 6z" fill-rule="evenodd"/>
 								</svg>
-							{/if}
-							{#if canvas.role !== 'owner'}
-								<span class="canvas-role">{canvas.role}</span>
-							{/if}
-						</button>
-					{/each}
+							</span>
+						{/if}
+						{#if beaconCanvasSet.has(canvas._id)}
+							<svg class="beacon-icon" width="14" height="14" viewBox="0 0 20 20" fill="none">
+								<circle cx="10" cy="14" r="2" fill="#f5a623" opacity="0.95"/>
+								<path d="M6.5 10 A5 5 0 0 1 13.5 10" stroke="#f5a623" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.7"/>
+								<path d="M4 7 A8 8 0 0 1 16 7" stroke="#f5a623" stroke-width="1.3" stroke-linecap="round" fill="none" opacity="0.4"/>
+							</svg>
+						{/if}
+						{#if canvas.role !== 'owner'}
+							<span class="canvas-role">{canvas.role}</span>
+						{/if}
+					</button>
+				{/each}
+				{#if showSearch && filteredCanvases.length === 0}
+					<p class="no-results">No Orbyts match</p>
 				{/if}
 			</div>
 			<div class="switcher-footer">
 				<button onclick={createNew} class="create-btn">
-					+ New shared canvas
+					+ New shared Orbyt
 				</button>
 			</div>
 		</div>
@@ -190,8 +254,54 @@
 		overflow: hidden;
 	}
 
+	.switcher-search {
+		padding: 6px 6px 0;
+	}
+
+	.search-input {
+		width: 100%;
+		padding: 6px 10px;
+		border-radius: 8px;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		background: rgba(255, 255, 255, 0.05);
+		color: rgba(255, 255, 255, 0.85);
+		font-size: 13px;
+		outline: none;
+		transition: border-color 0.15s;
+	}
+
+	.search-input::placeholder {
+		color: rgba(255, 255, 255, 0.3);
+	}
+
+	.search-input:focus {
+		border-color: rgba(251, 191, 36, 0.4);
+	}
+
 	.switcher-list {
 		padding: 6px;
+		max-height: 320px;
+		overflow-y: auto;
+	}
+
+	.switcher-list::-webkit-scrollbar {
+		width: 4px;
+	}
+
+	.switcher-list::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	.switcher-list::-webkit-scrollbar-thumb {
+		background: rgba(255, 255, 255, 0.15);
+		border-radius: 2px;
+	}
+
+	.no-results {
+		padding: 12px 10px;
+		font-size: 12px;
+		color: rgba(255, 255, 255, 0.35);
+		text-align: center;
 	}
 
 	.canvas-item {
@@ -235,6 +345,31 @@
 		font-size: 10px;
 		color: rgba(255, 255, 255, 0.35);
 		flex-shrink: 0;
+	}
+
+	.settings-btn {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		border-radius: 5px;
+		border: none;
+		background: transparent;
+		color: rgba(255, 255, 255, 0.3);
+		cursor: pointer;
+		opacity: 0;
+		transition: opacity 0.15s, color 0.15s, background 0.15s;
+	}
+
+	.canvas-item:hover .settings-btn {
+		opacity: 1;
+	}
+
+	.settings-btn:hover {
+		color: rgba(255, 255, 255, 0.7);
+		background: rgba(255, 255, 255, 0.08);
 	}
 
 	.switcher-footer {

@@ -1117,7 +1117,7 @@
 					onclick={() => { visibilityType = visibilityType === 'canvas' ? 'direct' : 'canvas'; }}
 					class="visibility-toggle cursor-pointer {visibilityType === 'direct' ? 'direct' : ''}"
 				>
-					{visibilityType === 'canvas' ? 'everyone on canvas' : 'select friends'}
+					{visibilityType === 'canvas' ? 'everyone here' : 'select friends'}
 				</button>
 			</div>
 

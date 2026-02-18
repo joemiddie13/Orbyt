@@ -30,7 +30,7 @@
 
 	async function createCanvas() {
 		if (!canvasName.trim()) {
-			error = 'Give your canvas a name';
+			error = 'Give your Orbyt a name';
 			return;
 		}
 		creating = true;
@@ -42,7 +42,7 @@
 			});
 			onCreated(canvasId as string);
 		} catch (err: any) {
-			error = err.message || 'Failed to create canvas';
+			error = err.message || 'Failed to create Orbyt';
 			creating = false;
 		}
 	}
@@ -56,7 +56,7 @@
 	<div class="glass-panel rounded-2xl w-full max-w-sm mx-4 overflow-hidden">
 		<div class="p-6">
 			<div class="flex items-center justify-between mb-5">
-				<h2 class="text-lg font-semibold text-white">New Shared Canvas</h2>
+				<h2 class="text-lg font-semibold text-white">New Shared Orbyt</h2>
 				<button
 					onclick={onClose}
 					class="text-white/40 hover:text-white/70 transition cursor-pointer"
@@ -99,7 +99,7 @@
 					</div>
 				</div>
 			{:else if !friends.isLoading}
-				<p class="text-sm text-white/40 mb-4">Add some friends first to invite them to a shared canvas.</p>
+				<p class="text-sm text-white/40 mb-4">Add some friends first to invite them to a shared Orbyt.</p>
 			{/if}
 
 			{#if error}
@@ -111,7 +111,7 @@
 				disabled={creating || !canvasName.trim()}
 				class="lego-btn lego-btn-full lego-amber"
 			>
-				{creating ? 'Creating...' : 'Create Canvas'}
+				{creating ? 'Creating...' : 'Create Orbyt'}
 			</button>
 		</div>
 	</div>

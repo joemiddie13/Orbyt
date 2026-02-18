@@ -15,6 +15,7 @@
 	import StickerPicker from '$lib/components/StickerPicker.svelte';
 	import PhotoDetailPanel from '$lib/components/PhotoDetailPanel.svelte';
 	import AddMusicModal from '$lib/components/AddMusicModal.svelte';
+	import OrbytSettingsPanel from '$lib/components/OrbytSettingsPanel.svelte';
 	import CanvasStylePicker from '$lib/components/CanvasStylePicker.svelte';
 	import ViewerAvatars from '$lib/components/ViewerAvatars.svelte';
 	import WellnessPanel from '$lib/components/WellnessPanel.svelte';
@@ -27,6 +28,12 @@
 	let landingTransitionRunning = $state(false);
 	let landingInitialized = false;
 
+	// Returning user hint — localStorage flag avoids landing page flash on reload
+	const AUTH_HINT_KEY = 'orbyt-auth-hint';
+	const isBrowser = typeof window !== 'undefined';
+	let returningUser = $state(isBrowser && !!window.localStorage?.getItem(AUTH_HINT_KEY));
+	let showLoadingSpinner = $state(false);
+
 	const client = useConvexClient();
 	const currentUser = useCurrentUser();
 
@@ -35,7 +42,7 @@
 
 	// Active canvas state — starts with personal canvas, can switch to shared
 	let activeCanvasId = $state<string | null>(null);
-	let activeCanvasName = $state<string>('My Canvas');
+	let activeCanvasName = $state<string>('My Orbyt');
 
 	// WebRTC state
 	let peerManager = $state<PeerManager | null>(null);
@@ -58,6 +65,7 @@
 	let selectedPhoto = $state<any>(null);
 	let showAddMusic = $state(false);
 	let showWellness = $state(false);
+	let settingsCanvas = $state<{ id: string; name: string } | null>(null);
 	let playingMusicId = $state<string | null>(null);
 	let overlayMode = $state<'none' | 'dots' | 'lines'>('none');
 	let dragOver = $state(false);
@@ -139,10 +147,12 @@
 		() => activeCanvasId && currentUser.isAuthenticated ? { canvasId: activeCanvasId as any } : 'skip'
 	);
 
-	// Auth settling — show modal faster for logged-out users
+	// Auth settling — persist hint for seamless reloads
 	$effect(() => {
 		if (currentUser.isAuthenticated) {
 			authSettled = true;
+			showLoadingSpinner = false;
+			try { localStorage.setItem(AUTH_HINT_KEY, '1'); } catch {}
 		}
 	});
 
@@ -171,12 +181,13 @@
 			// User just logged out — reset to landing page
 			wasAuthenticated = false;
 			activeCanvasId = null;
-			activeCanvasName = 'My Canvas';
+			activeCanvasName = 'My Orbyt';
 			renderer.syncObjects([], false);
 			renderer.enterLandingMode();
 			landingMode = true;
 			landingInitialized = true;
 			overlayMode = 'dots';
+			try { localStorage.removeItem(AUTH_HINT_KEY); } catch {}
 			// Clean up WebRTC
 			peerManager?.destroy();
 			peerManager = null;
@@ -267,6 +278,8 @@
 
 		// Join this canvas
 		client.mutation(api.presence.joinCanvas, { canvasId: canvasId as any }).catch(() => {});
+		// Track visit for switcher sorting
+		client.mutation(api.access.recordCanvasVisit, { canvasId: canvasId as any }).catch(() => {});
 
 		// Set PeerManager canvas
 		peerManager?.setCanvas(canvasId);
@@ -320,12 +333,14 @@
 		renderer = new CanvasRenderer();
 		await renderer.init(canvasContainer);
 
-		// Wait for auth token to propagate before deciding landing vs canvas.
-		// If already authenticated (token arrived fast), skip landing immediately.
-		// Otherwise wait up to 800ms — if still unauthenticated, show landing page.
+		// Decide auth flow based on returning user hint:
+		// - Returning user (localStorage hint): show spinner on deep space, wait up to 2.5s
+		// - New visitor (no hint): show landing page almost immediately
 		if (currentUser.isAuthenticated) {
 			authSettled = true;
-		} else {
+		} else if (returningUser) {
+			// Returning user — show subtle loading spinner, give auth time to propagate
+			showLoadingSpinner = true;
 			await new Promise<void>((resolve) => {
 				const checkInterval = setInterval(() => {
 					if (currentUser.isAuthenticated) {
@@ -336,17 +351,40 @@
 				setTimeout(() => {
 					clearInterval(checkInterval);
 					resolve();
-				}, 800);
+				}, 2500);
 			});
 			authSettled = true;
-		}
-
-		// Now decide: landing page or straight to canvas
-		if (!currentUser.isAuthenticated && !landingInitialized) {
-			landingInitialized = true;
-			landingMode = true;
-			renderer.enterLandingMode();
-			overlayMode = 'dots';
+			showLoadingSpinner = false;
+			// If auth still failed, session expired — clear hint, show landing
+			if (!currentUser.isAuthenticated && !landingInitialized) {
+				try { localStorage.removeItem(AUTH_HINT_KEY); } catch {}
+				returningUser = false;
+				landingInitialized = true;
+				landingMode = true;
+				renderer.enterLandingMode();
+				overlayMode = 'dots';
+			}
+		} else {
+			// New visitor — brief check then straight to landing
+			await new Promise<void>((resolve) => {
+				const checkInterval = setInterval(() => {
+					if (currentUser.isAuthenticated) {
+						clearInterval(checkInterval);
+						resolve();
+					}
+				}, 50);
+				setTimeout(() => {
+					clearInterval(checkInterval);
+					resolve();
+				}, 300);
+			});
+			authSettled = true;
+			if (!currentUser.isAuthenticated && !landingInitialized) {
+				landingInitialized = true;
+				landingMode = true;
+				renderer.enterLandingMode();
+				overlayMode = 'dots';
+			}
 		}
 
 		// Wire up drag-start → WebRTC broadcast (lift animation on remote)
@@ -531,6 +569,7 @@
 	function handleEscape(e: KeyboardEvent) {
 		if (e.key !== 'Escape') return;
 		// Close the topmost open modal (order: overlays first, then panels, then pickers)
+		if (settingsCanvas) { settingsCanvas = null; return; }
 		if (showWellness) { showWellness = false; return; }
 		if (inlineEditState) { closeInlineEditor(); return; }
 		if (showAddMusic) { showAddMusic = false; return; }
@@ -730,7 +769,7 @@
 	/** Handle new shared canvas creation */
 	function onCanvasCreated(canvasId: string) {
 		activeCanvasId = canvasId;
-		activeCanvasName = 'New Canvas';
+		activeCanvasName = 'New Orbyt';
 		showCreateCanvas = false;
 	}
 
@@ -981,6 +1020,12 @@
 
 <div bind:this={canvasContainer} class="w-screen h-screen overflow-hidden"></div>
 
+{#if showLoadingSpinner}
+	<div class="fixed inset-0 z-30 flex items-center justify-center pointer-events-none">
+		<div class="loading-orb"></div>
+	</div>
+{/if}
+
 {#if dragOver}
 	<div class="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
 		<div class="absolute inset-4 border-2 border-dashed border-white/40 rounded-2xl"></div>
@@ -1013,6 +1058,7 @@
 		canvases={accessibleCanvases.data}
 		onSelectCanvas={switchCanvas}
 		onCreateCanvas={() => { showCreateCanvas = true; }}
+		onSettingsCanvas={(id, name) => { settingsCanvas = { id, name }; }}
 		{webrtcConnected}
 		hasFriendBeacons={friendBeaconActivity.data?.hasFriendBeacons ?? false}
 		activeBeaconCanvasIds={friendBeaconActivity.data?.activeCanvasIds ?? []}
@@ -1134,6 +1180,21 @@
 		canvasId={activeCanvasId}
 		onClose={() => { showAddMusic = false; }}
 		onCreated={() => { showAddMusic = false; }}
+	/>
+{/if}
+
+{#if settingsCanvas}
+	<OrbytSettingsPanel
+		canvasId={settingsCanvas.id}
+		canvasName={settingsCanvas.name}
+		onClose={() => { settingsCanvas = null; }}
+		onDeleted={() => {
+			settingsCanvas = null;
+			if (personalCanvas.data) {
+				activeCanvasId = personalCanvas.data._id;
+				activeCanvasName = personalCanvas.data.name;
+			}
+		}}
 	/>
 {/if}
 

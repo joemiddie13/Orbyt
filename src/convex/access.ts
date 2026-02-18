@@ -223,14 +223,38 @@ export const getAccessibleCanvases = query({
 			),
 		]);
 
+		// Pair shared canvases with their access records before filtering
+		const sharedWithAccess = sharedCanvases
+			.map((c, i) => c ? { ...c, role: accessRecords[i].role, lastAccessedAt: accessRecords[i].lastAccessedAt } : null)
+			.filter(Boolean);
+
 		return [
-			...ownedCanvases.map((c) => ({ ...c, role: "owner" as const })),
-			...sharedCanvases
-				.filter(Boolean)
-				.map((c, i) => ({ ...c!, role: accessRecords[i].role })),
+			...ownedCanvases.map((c) => ({ ...c, role: "owner" as const, lastAccessedAt: undefined as number | undefined })),
+			...sharedWithAccess,
 			...friendCanvases
 				.filter(Boolean)
-				.map((c) => ({ ...c!, role: "viewer" as const })),
+				.map((c) => ({ ...c!, role: "viewer" as const, lastAccessedAt: undefined as number | undefined })),
 		];
+	},
+});
+
+/** Record a canvas visit — updates lastAccessedAt for sorting in the switcher */
+export const recordCanvasVisit = mutation({
+	args: { canvasId: v.id("canvases") },
+	handler: async (ctx, args) => {
+		const user = await getAuthenticatedUser(ctx).catch(() => null);
+		if (!user) return;
+
+		// Only track for shared canvases where the user has an explicit access record
+		const existing = await ctx.db
+			.query("canvasAccess")
+			.withIndex("by_canvas_user", (q) =>
+				q.eq("canvasId", args.canvasId).eq("userId", user.uuid)
+			)
+			.first();
+
+		if (existing) {
+			await ctx.db.patch(existing._id, { lastAccessedAt: Date.now() });
+		}
 	},
 });

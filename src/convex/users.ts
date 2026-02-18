@@ -82,7 +82,7 @@ export const createUser = mutation({
 		// Auto-create personal canvas
 		await ctx.db.insert("canvases", {
 			ownerId: uuid,
-			name: `${args.username}'s canvas`,
+			name: `${args.username}'s Orbyt`,
 			type: "personal",
 			bounds: { width: 3000, height: 2000 },
 		});
