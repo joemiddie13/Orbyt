@@ -137,7 +137,8 @@ export default defineSchema({
 		createdAt: v.number(),
 	})
 		.index("by_canvas_recipient", ["canvasId", "toUserId"])
-		.index("by_created", ["createdAt"]),
+		.index("by_created", ["createdAt"])
+		.index("by_sender_created", ["fromUserId", "createdAt"]),
 
 	canvasPresence: defineTable({
 		canvasId: v.id("canvases"),

@@ -30,11 +30,13 @@ export const sendSignal = mutation({
 		}
 
 		// Rate limit: max 30 signals per minute per user (prevents signaling flood)
+		// Uses compound index to scope reads to this user only — avoids cross-user OCC conflicts
 		const oneMinuteAgo = Date.now() - 60_000;
 		const recentSignals = await ctx.db
 			.query("signalingMessages")
-			.withIndex("by_created", (q) => q.gt("createdAt", oneMinuteAgo))
-			.filter((q) => q.eq(q.field("fromUserId"), user.uuid))
+			.withIndex("by_sender_created", (q) =>
+				q.eq("fromUserId", user.uuid).gt("createdAt", oneMinuteAgo)
+			)
 			.collect();
 		if (recentSignals.length >= 30) {
 			throw new Error("Signaling too fast — try again in a moment");

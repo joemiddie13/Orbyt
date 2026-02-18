@@ -44,12 +44,10 @@ export const heartbeat = mutation({
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
 		if (!user) return;
 
-		try {
-			await checkCanvasAccess(ctx, args.canvasId, user.uuid, "viewer");
-		} catch {
-			return;
-		}
-
+		// Skip full checkCanvasAccess — heartbeat is high-frequency and access was
+		// already verified on joinCanvas. Just verify the presence record exists
+		// (implicitly proves prior access). This avoids reading the canvases table
+		// on every heartbeat, reducing OCC conflict surface.
 		const now = Date.now();
 		const existing = await ctx.db
 			.query("canvasPresence")
@@ -62,15 +60,8 @@ export const heartbeat = mutation({
 			// Server-side throttle: ignore heartbeats less than 20s apart
 			if (now - existing.lastSeen < 20_000) return;
 			await ctx.db.patch(existing._id, { lastSeen: now });
-		} else {
-			await ctx.db.insert("canvasPresence", {
-				canvasId: args.canvasId,
-				userId: user.uuid,
-				username: user.username,
-				displayName: user.displayName,
-				lastSeen: now,
-			});
 		}
+		// No record = never joined or access revoked — silently no-op
 	},
 });
 
