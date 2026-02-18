@@ -25,5 +25,8 @@ vite.config.ts.timestamp-*
 # Claude Code
 .claude/
 
+# Session notes (dev workflow, not project docs)
+session-notes/
+
 # Playwright MCP
 .playwright-mcp/

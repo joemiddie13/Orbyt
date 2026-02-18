@@ -22,6 +22,11 @@ export const respond = mutation({
 		// Verify caller has access to the beacon's canvas
 		await checkCanvasAccess(ctx, beacon.canvasId, user.uuid, "viewer");
 
+		// Reject responses to expired beacons
+		if (beacon.expiresAt && beacon.expiresAt < Date.now()) {
+			throw new Error("This beacon has expired");
+		}
+
 		// Check for existing response (upsert)
 		const existing = await ctx.db
 			.query("beaconResponses")
@@ -108,12 +113,13 @@ export const getByBeacon = query({
 	},
 });
 
-/** Get responses for a direct beacon group (aggregates only from accessible copies) */
+/** Get responses for a direct beacon group.
+ * Creator sees individual responses with names. Recipients see only aggregated counts. */
 export const getByBeaconGroup = query({
 	args: { directBeaconGroupId: v.string() },
 	handler: async (ctx, args) => {
 		const user = await getAuthenticatedUser(ctx).catch(() => null);
-		if (!user) return [];
+		if (!user) return { responses: [], counts: { joining: 0, interested: 0, declined: 0, total: 0 }, isCreator: false };
 
 		// Use index instead of full table scan
 		const groupBeacons = await ctx.db
@@ -121,7 +127,10 @@ export const getByBeaconGroup = query({
 			.withIndex("by_beacon_group", (q) => q.eq("directBeaconGroupId", args.directBeaconGroupId))
 			.collect();
 
-		if (groupBeacons.length === 0) return [];
+		if (groupBeacons.length === 0) return { responses: [], counts: { joining: 0, interested: 0, declined: 0, total: 0 }, isCreator: false };
+
+		// Check if caller is the beacon creator
+		const isCreator = groupBeacons.some((b) => b.creatorId === user.uuid);
 
 		// Filter to only beacons the caller can actually access (parallel check)
 		const accessibleBeacons = (await Promise.all(
@@ -134,7 +143,7 @@ export const getByBeaconGroup = query({
 				}
 			})
 		)).filter((b): b is NonNullable<typeof b> => b !== null);
-		if (accessibleBeacons.length === 0) return [];
+		if (accessibleBeacons.length === 0) return { responses: [], counts: { joining: 0, interested: 0, declined: 0, total: 0 }, isCreator };
 
 		// Aggregate responses only from accessible beacons
 		const allResponses = await Promise.all(
@@ -157,8 +166,33 @@ export const getByBeaconGroup = query({
 			}
 		}
 
+		// Compute aggregated counts (always returned)
+		const allResps = [...byUser.values()];
+		const counts = {
+			joining: allResps.filter((r) => r.status === "joining").length,
+			interested: allResps.filter((r) => r.status === "interested").length,
+			declined: allResps.filter((r) => r.status === "declined").length,
+			total: allResps.length,
+		};
+
+		// Only the beacon creator sees individual response details
+		if (!isCreator) {
+			// Recipients see only their own response + aggregated counts
+			const ownResponse = byUser.get(user.uuid);
+			return {
+				responses: ownResponse ? [{
+					...ownResponse,
+					displayName: user.displayName ?? "You",
+					username: user.username ?? "you",
+				}] : [],
+				counts,
+				isCreator,
+			};
+		}
+
+		// Creator gets full individual responses
 		const results = await Promise.all(
-			[...byUser.values()].map(async (resp) => {
+			allResps.map(async (resp) => {
 				const responder = await ctx.db
 					.query("users")
 					.withIndex("by_uuid", (q) => q.eq("uuid", resp.userId))
@@ -171,6 +205,6 @@ export const getByBeaconGroup = query({
 			})
 		);
 
-		return results;
+		return { responses: results, counts, isCreator };
 	},
 });

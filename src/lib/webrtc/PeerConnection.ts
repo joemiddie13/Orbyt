@@ -243,6 +243,10 @@ export class PeerConnection {
 				if (msg.type === 'pong') {
 					return;
 				}
+				// Override userId with known remote peer identity — never trust self-reported identity
+				if ('userId' in msg) {
+					(msg as any).userId = this.remoteUserId;
+				}
 				this.callbacks.onData(msg);
 			} catch {
 				// Malformed message

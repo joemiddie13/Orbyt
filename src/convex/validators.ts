@@ -87,4 +87,8 @@ export function validateBeaconContent(content: {
 	if (content.locationAddress && content.locationAddress.length > MAX_LOCATION_LENGTH) {
 		throw new Error(`Location must be ${MAX_LOCATION_LENGTH} characters or less`);
 	}
+	// Strip URLs from location field to prevent phishing
+	if (content.locationAddress && /https?:\/\/|ftp:\/\//i.test(content.locationAddress)) {
+		throw new Error("Location cannot contain URLs — enter a place name or address instead");
+	}
 }

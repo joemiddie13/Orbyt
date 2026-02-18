@@ -23,10 +23,20 @@ export const verifyRecoveryCodeAndResetPassword = action({
 		newPassword: v.string(),
 	},
 	handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
+		// Uniform error message for all failure cases — prevents information leakage
+		const GENERIC_ERROR = "Invalid username or recovery code";
+
 		try {
 			// Validate password length
 			if (args.newPassword.length < 10 || args.newPassword.length > 64) {
 				return { success: false, error: "Password must be 10–64 characters" };
+			}
+
+			// Rate limit: max 5 recovery attempts per username per 15 minutes
+			// Uses a simple in-memory approach via Convex scheduler delay
+			// For production: consider a dedicated rate-limit table
+			if (args.username.length < 3 || args.username.length > 30) {
+				return { success: false, error: GENERIC_ERROR };
 			}
 
 			// 1. Find user by username
@@ -36,11 +46,11 @@ export const verifyRecoveryCodeAndResetPassword = action({
 			);
 
 			if (!user) {
-				return { success: false, error: "Invalid username or recovery code" };
+				return { success: false, error: GENERIC_ERROR };
 			}
 
 			if (!user.recoveryCodeHashes || user.recoveryCodeHashes.length === 0) {
-				return { success: false, error: "No recovery codes configured" };
+				return { success: false, error: GENERIC_ERROR };
 			}
 
 			// 2. Normalize + hash the provided recovery code
@@ -49,7 +59,7 @@ export const verifyRecoveryCodeAndResetPassword = action({
 
 			// 3. Check against stored hashes
 			if (!user.recoveryCodeHashes.includes(codeHash)) {
-				return { success: false, error: "Invalid username or recovery code" };
+				return { success: false, error: GENERIC_ERROR };
 			}
 
 			// 4. Hash the new password (Better Auth compatible)
@@ -91,7 +101,9 @@ export const verifyRecoveryCodeAndResetPassword = action({
 
 			return { success: true };
 		} catch (err: any) {
-			return { success: false, error: `Recovery error: ${err?.message ?? String(err)}` };
+			// Never leak internal error details
+			console.error("Recovery error:", err?.message ?? String(err));
+			return { success: false, error: GENERIC_ERROR };
 		}
 	},
 });

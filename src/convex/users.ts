@@ -59,6 +59,12 @@ export const createUser = mutation({
 		if (args.displayName.length < 1 || args.displayName.length > 50) {
 			throw new Error("Display name must be 1–50 characters");
 		}
+		// Strip RTL/LTR override characters and zero-width characters to prevent spoofing
+		const stripped = args.displayName.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '');
+		if (stripped.length < 1) {
+			throw new Error("Display name cannot be empty or only invisible characters");
+		}
+		args = { ...args, displayName: stripped };
 
 		// Check if user already exists for this auth account
 		const existing = await ctx.db

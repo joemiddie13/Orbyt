@@ -37,6 +37,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		newResponse.headers.set("X-Content-Type-Options", "nosniff");
 		newResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
 		newResponse.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+		newResponse.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
 		return newResponse;
 	}
 

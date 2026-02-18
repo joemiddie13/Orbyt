@@ -45,6 +45,12 @@ export const addSticker = mutation({
 			throw new Error(`Max ${MAX_STICKERS_PER_USER} stickers per object`);
 		}
 
+		// Cooldown: prevent rapid add/remove spam cycles (1 second between adds)
+		const lastUserSticker = userStickers.sort((a, b) => b.createdAt - a.createdAt)[0];
+		if (lastUserSticker && Date.now() - lastUserSticker.createdAt < 1000) {
+			throw new Error("Adding stickers too fast — wait a moment");
+		}
+
 		return ctx.db.insert("stickerReactions", {
 			objectId: args.objectId,
 			userId: user.uuid,

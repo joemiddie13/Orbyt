@@ -37,6 +37,15 @@ export const createSharedCanvas = mutation({
 			throw new Error("Canvas name must be 1–100 characters");
 		}
 
+		// Quota: max 25 shared canvases per user
+		const existingShared = await ctx.db
+			.query("canvases")
+			.withIndex("by_owner_type", (q) => q.eq("ownerId", user.uuid).eq("type", "shared"))
+			.collect();
+		if (existingShared.length >= 25) {
+			throw new Error("You've reached the maximum of 25 shared Orbyts");
+		}
+
 		const canvasId = await ctx.db.insert("canvases", {
 			ownerId: user.uuid,
 			name: args.name,
