@@ -61,6 +61,8 @@
 		onDelete(note._id);
 	}
 
+	const isPlaceholder = note.content.text === 'New note...' || note.content.text === '<p>New note...</p>';
+
 	onMount(() => {
 		editor = new Editor({
 			element: editorElement,
@@ -69,7 +71,7 @@
 					heading: { levels: [1, 2, 3] },
 				}),
 			],
-			content: note.content.text,
+			content: isPlaceholder ? '' : note.content.text,
 			editable: true,
 			autofocus: true,
 			onUpdate: ({ editor: e }) => {
