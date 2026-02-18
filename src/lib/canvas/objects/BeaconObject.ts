@@ -111,7 +111,59 @@ export class BeaconObject {
 		this.isExpired = options.isExpired ?? false;
 		const isDirect = options.isDirect ?? content.visibilityType === 'direct';
 		this.baseColor = isDirect ? DIRECT_BEACON_COLOR : BEACON_COLOR;
-		this.cardHeight = BEACON_WIDTH; // Square card
+		// --- Pre-measure text to determine card height ---
+		const titleStyle = new TextStyle({
+			fontFamily: FONT_FAMILY,
+			fontSize: 32,
+			fontWeight: 'bold',
+			fill: 0xffffff,
+			wordWrap: true,
+			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
+			lineHeight: 40,
+		});
+		const titleText = new Text({ text: content.title, style: titleStyle });
+		titleText.x = BEACON_PADDING;
+		titleText.y = BEACON_PADDING;
+
+		const { dateStr, timeStr } = this.formatDateAndTime(content.startTime, content.endTime);
+		const detailStyle = new TextStyle({
+			fontFamily: FONT_FAMILY,
+			fontSize: 20,
+			fill: 0xffffff,
+			wordWrap: true,
+			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
+		});
+		const dateText = new Text({ text: dateStr, style: detailStyle });
+		dateText.x = BEACON_PADDING;
+		dateText.y = titleText.y + titleText.height + 16;
+		dateText.alpha = 0.85;
+
+		const timeText = new Text({ text: timeStr, style: detailStyle });
+		timeText.x = BEACON_PADDING;
+		timeText.y = dateText.y + dateText.height + 8;
+		timeText.alpha = 0.75;
+
+		let bottomY = timeText.y + timeText.height;
+
+		let fromText: Text | null = null;
+		if (isDirect && content.fromUsername) {
+			fromText = new Text({ text: `From ${content.fromUsername}`, style: detailStyle });
+			fromText.x = BEACON_PADDING;
+			fromText.y = bottomY + 12;
+			fromText.alpha = 0.7;
+			bottomY = fromText.y + fromText.height;
+		}
+
+		let locText: Text | null = null;
+		if (content.locationAddress) {
+			locText = new Text({ text: `📍 ${content.locationAddress}`, style: detailStyle });
+			locText.x = BEACON_PADDING;
+			locText.y = bottomY + 12;
+			locText.alpha = 0.75;
+			bottomY = locText.y + locText.height;
+		}
+
+		this.cardHeight = Math.max(bottomY + BEACON_PADDING, BEACON_WIDTH);
 
 		this.container = new Container();
 		this.container.x = x;
@@ -216,60 +268,12 @@ export class BeaconObject {
 		this.signalDot.alpha = 0.7;
 		this.container.addChild(this.signalDot);
 
-		// --- Layer 7: Text content ---
-		const titleStyle = new TextStyle({
-			fontFamily: FONT_FAMILY,
-			fontSize: 32,
-			fontWeight: 'bold',
-			fill: 0xffffff,
-			wordWrap: true,
-			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
-			lineHeight: 40,
-		});
-		const titleText = new Text({ text: content.title, style: titleStyle });
-		titleText.x = BEACON_PADDING;
-		titleText.y = BEACON_PADDING;
+		// --- Layer 7: Text content (pre-measured above) ---
 		this.container.addChild(titleText);
-
-		// Date line (separate from time)
-		const { dateStr, timeStr } = this.formatDateAndTime(content.startTime, content.endTime);
-		const detailStyle = new TextStyle({
-			fontFamily: FONT_FAMILY,
-			fontSize: 20,
-			fill: 0xffffff,
-			wordWrap: true,
-			wordWrapWidth: BEACON_WIDTH - BEACON_PADDING * 2,
-		});
-		const dateText = new Text({ text: dateStr, style: detailStyle });
-		dateText.x = BEACON_PADDING;
-		dateText.y = titleText.y + titleText.height + 16;
-		dateText.alpha = 0.85;
 		this.container.addChild(dateText);
-
-		// Time line
-		const timeText = new Text({ text: timeStr, style: detailStyle });
-		timeText.x = BEACON_PADDING;
-		timeText.y = dateText.y + dateText.height + 8;
-		timeText.alpha = 0.75;
 		this.container.addChild(timeText);
-
-		// "From [username]" for direct beacons — above bottom info
-		if (isDirect && content.fromUsername) {
-			const fromText = new Text({ text: `From ${content.fromUsername}`, style: detailStyle });
-			fromText.x = BEACON_PADDING;
-			fromText.y = this.cardHeight - BEACON_PADDING - (content.locationAddress ? 58 : 30);
-			fromText.alpha = 0.7;
-			this.container.addChild(fromText);
-		}
-
-		// Location — pinned to bottom with proper padding
-		if (content.locationAddress) {
-			const locText = new Text({ text: `📍 ${content.locationAddress}`, style: detailStyle });
-			locText.x = BEACON_PADDING;
-			locText.y = this.cardHeight - BEACON_PADDING - 28;
-			locText.alpha = 0.75;
-			this.container.addChild(locText);
-		}
+		if (fromText) this.container.addChild(fromText);
+		if (locText) this.container.addChild(locText);
 
 		// Expired label
 		if (this.isExpired) {

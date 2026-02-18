@@ -898,7 +898,18 @@
 				startRipples();
 				initParallax();
 			});
-			error = err.message || 'Failed to broadcast beacon';
+			const msg = err.message || '';
+			if (msg.includes('Start time cannot be in the past')) {
+				error = 'That time has already passed — try a future time like "in 30 min" or "tomorrow at 3pm"';
+			} else if (msg.includes('Start time must be before end time')) {
+				error = 'The end time needs to be after the start time — try a longer duration';
+			} else if (msg.includes('Beacon duration cannot exceed')) {
+				error = 'Beacons can last up to 90 days — try a shorter duration';
+			} else if (msg.includes('cannot expire more than 90 days')) {
+				error = 'That\'s too far out — beacons can be scheduled up to 90 days ahead';
+			} else {
+				error = 'Something went wrong broadcasting your beacon. Try again!';
+			}
 			creating = false;
 		}
 	}
