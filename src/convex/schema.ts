@@ -52,6 +52,7 @@ export default defineSchema({
 		.index("by_requester", ["requesterId"])
 		.index("by_receiver", ["receiverId"])
 		.index("by_pair", ["requesterId", "receiverId"])
+		.index("by_pair_status", ["requesterId", "receiverId", "status"])
 		.index("by_requester_status", ["requesterId", "status"])
 		.index("by_receiver_status", ["receiverId", "status"]),
 

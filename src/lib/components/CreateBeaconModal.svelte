@@ -181,30 +181,34 @@
 		return `${dayLabel}, ${startStr} \u2013 ${endStr}`;
 	}
 
-	// Reactive time parsing
+	// Reactive time parsing (debounced to avoid running chrono-node on every keystroke)
+	let parseTimer: ReturnType<typeof setTimeout>;
 	$effect(() => {
 		const _w = whenText;
 		const _d = durationText;
 
-		const start = parseWhen(_w);
-		const effectiveStart = start ?? new Date();
+		clearTimeout(parseTimer);
+		parseTimer = setTimeout(() => {
+			const start = parseWhen(_w);
+			const effectiveStart = start ?? new Date();
 
-		const end = parseDuration(_d, effectiveStart);
-		const effectiveEnd = end ?? new Date(effectiveStart.getTime() + 2 * 60 * 60 * 1000);
+			const end = parseDuration(_d, effectiveStart);
+			const effectiveEnd = end ?? new Date(effectiveStart.getTime() + 2 * 60 * 60 * 1000);
 
-		parsedStart = start;
-		parsedEnd = end;
+			parsedStart = start;
+			parsedEnd = end;
 
-		if (_w.trim() && !start) {
-			parseError = "Try \u2018in 30 min\u2019 or \u2018at 5pm\u2019";
-			timePreview = '';
-		} else if (_d.trim() && !end) {
-			parseError = "Try \u20182 hours\u2019 or \u2018until 6pm\u2019";
-			timePreview = '';
-		} else {
-			parseError = '';
-			timePreview = formatTimePreview(effectiveStart, effectiveEnd);
-		}
+			if (_w.trim() && !start) {
+				parseError = "Try \u2018in 30 min\u2019 or \u2018at 5pm\u2019";
+				timePreview = '';
+			} else if (_d.trim() && !end) {
+				parseError = "Try \u20182 hours\u2019 or \u2018until 6pm\u2019";
+				timePreview = '';
+			} else {
+				parseError = '';
+				timePreview = formatTimePreview(effectiveStart, effectiveEnd);
+			}
+		}, 300);
 	});
 
 	function toggleRecipient(uuid: string) {

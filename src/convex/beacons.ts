@@ -106,7 +106,7 @@ export const cleanupExpired = internalMutation({
 		const expiredBeacons = await ctx.db
 			.query("canvasObjects")
 			.withIndex("by_type_expires", (q) => q.eq("type", "beacon").lt("expiresAt", now))
-			.collect();
+			.take(1000);
 
 		// Cascade-delete all expired beacons and associated data in parallel
 		await Promise.all(expiredBeacons.map(async (beacon) => {
@@ -194,12 +194,10 @@ export const createDirectBeacon = mutation({
 		await Promise.all(args.recipientUuids.map(async (recipientUuid) => {
 			const [fwd, rev] = await Promise.all([
 				ctx.db.query("friendships")
-					.withIndex("by_pair", (q) => q.eq("requesterId", user.uuid).eq("receiverId", recipientUuid))
-					.filter((q) => q.eq(q.field("status"), "accepted"))
+					.withIndex("by_pair_status", (q) => q.eq("requesterId", user.uuid).eq("receiverId", recipientUuid).eq("status", "accepted"))
 					.first(),
 				ctx.db.query("friendships")
-					.withIndex("by_pair", (q) => q.eq("requesterId", recipientUuid).eq("receiverId", user.uuid))
-					.filter((q) => q.eq(q.field("status"), "accepted"))
+					.withIndex("by_pair_status", (q) => q.eq("requesterId", recipientUuid).eq("receiverId", user.uuid).eq("status", "accepted"))
 					.first(),
 			]);
 			if (!fwd && !rev) throw new Error("Can only send beacons to friends");

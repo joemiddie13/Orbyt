@@ -526,11 +526,15 @@
 			}
 		};
 
-		// Stream cursor position over WebRTC
+		// Stream cursor position over WebRTC (throttled to match PeerManager's 50ms rate)
 		renderer.app.stage.eventMode = 'static';
 		renderer.app.stage.hitArea = renderer.app.screen;
+		let lastCursorSendTime = 0;
 		renderer.app.stage.on('pointermove', (event) => {
 			if (!peerManager) return;
+			const now = performance.now();
+			if (now - lastCursorSendTime < 50) return;
+			lastCursorSendTime = now;
 			const world = renderer.screenToWorld(event.globalX, event.globalY);
 			peerManager.sendCursor(world.x, world.y);
 		});

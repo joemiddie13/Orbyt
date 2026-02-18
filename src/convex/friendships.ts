@@ -8,13 +8,11 @@ export async function areFriends(ctx: QueryCtx | MutationCtx, uuidA: string, uui
 	const [forward, reverse] = await Promise.all([
 		ctx.db
 			.query("friendships")
-			.withIndex("by_pair", (q) => q.eq("requesterId", uuidA).eq("receiverId", uuidB))
-			.filter((q) => q.eq(q.field("status"), "accepted"))
+			.withIndex("by_pair_status", (q) => q.eq("requesterId", uuidA).eq("receiverId", uuidB).eq("status", "accepted"))
 			.first(),
 		ctx.db
 			.query("friendships")
-			.withIndex("by_pair", (q) => q.eq("requesterId", uuidB).eq("receiverId", uuidA))
-			.filter((q) => q.eq(q.field("status"), "accepted"))
+			.withIndex("by_pair_status", (q) => q.eq("requesterId", uuidB).eq("receiverId", uuidA).eq("status", "accepted"))
 			.first(),
 	]);
 	return !!(forward || reverse);

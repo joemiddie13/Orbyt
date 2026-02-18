@@ -59,6 +59,8 @@ export class PhotoObject {
 	/** Random tilt delta added during drag lift */
 	private liftRotation = 0;
 	private cleanupHover: (() => void) | null = null;
+	private dragCleanup: (() => void) | null = null;
+	private longPressCleanup: (() => void) | null = null;
 
 	constructor(content: PhotoContent, x: number, y: number, options: PhotoObjectOptions = {}) {
 		this.objectId = options.objectId;
@@ -105,7 +107,7 @@ export class PhotoObject {
 
 		// Owner: drag + long-press. Visitor: long-press only.
 		if (options.editable !== false) {
-			makeDraggable(this.container, {
+			this.dragCleanup = makeDraggable(this.container, {
 				onDragStart: () => {
 					this.animateDragLift();
 					if (this.objectId && options.onDragStart) options.onDragStart(this.objectId);
@@ -122,7 +124,7 @@ export class PhotoObject {
 				},
 			});
 		} else if (options.onLongPress) {
-			makeLongPressable(this.container, (sx, sy) => {
+			this.longPressCleanup = makeLongPressable(this.container, (sx, sy) => {
 				if (this.objectId) options.onLongPress!(this.objectId, sx, sy);
 			});
 		}
@@ -245,6 +247,8 @@ export class PhotoObject {
 
 	/** Kill all running GSAP tweens — call before removal */
 	destroy() {
+		this.dragCleanup?.();
+		this.longPressCleanup?.();
 		this.cleanupHover?.();
 		gsap.killTweensOf(this.container);
 		gsap.killTweensOf(this.container.scale);

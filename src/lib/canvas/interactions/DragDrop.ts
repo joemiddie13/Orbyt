@@ -31,7 +31,7 @@ export interface DragDropOptions {
  * Makes a container respond to long-press only (no drag).
  * Used for non-owners who can still place sticker reactions.
  */
-export function makeLongPressable(target: Container, onLongPress: (screenX: number, screenY: number) => void) {
+export function makeLongPressable(target: Container, onLongPress: (screenX: number, screenY: number) => void): () => void {
 	let isDown = false;
 	let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 	let startScreenX = 0;
@@ -41,7 +41,7 @@ export function makeLongPressable(target: Container, onLongPress: (screenX: numb
 	target.eventMode = 'static';
 	target.cursor = CURSOR_DEFAULT;
 
-	target.on('pointerdown', (event: FederatedPointerEvent) => {
+	const onPointerDown = (event: FederatedPointerEvent) => {
 		isDown = true;
 		fired = false;
 		startScreenX = event.globalX;
@@ -55,9 +55,9 @@ export function makeLongPressable(target: Container, onLongPress: (screenX: numb
 				onLongPress(startScreenX, startScreenY);
 			}
 		}, LONG_PRESS_DURATION);
-	});
+	};
 
-	target.on('globalpointermove', (event: FederatedPointerEvent) => {
+	const onPointerMove = (event: FederatedPointerEvent) => {
 		if (!isDown) return;
 		const dx = event.globalX - startScreenX;
 		const dy = event.globalY - startScreenY;
@@ -67,22 +67,32 @@ export function makeLongPressable(target: Container, onLongPress: (screenX: numb
 				longPressTimer = null;
 			}
 		}
-	});
+	};
 
-	function endPress() {
+	const endPress = () => {
 		isDown = false;
 		fired = false;
 		if (longPressTimer) {
 			clearTimeout(longPressTimer);
 			longPressTimer = null;
 		}
-	}
+	};
 
+	target.on('pointerdown', onPointerDown);
+	target.on('globalpointermove', onPointerMove);
 	target.on('pointerup', endPress);
 	target.on('pointerupoutside', endPress);
+
+	return () => {
+		endPress();
+		target.off('pointerdown', onPointerDown);
+		target.off('globalpointermove', onPointerMove);
+		target.off('pointerup', endPress);
+		target.off('pointerupoutside', endPress);
+	};
 }
 
-export function makeDraggable(target: Container, options: DragDropOptions = {}) {
+export function makeDraggable(target: Container, options: DragDropOptions = {}): () => void {
 	let isDragging = false;
 	let offsetX = 0;
 	let offsetY = 0;
@@ -97,7 +107,7 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 	target.eventMode = 'static';
 	target.cursor = CURSOR_GRAB;
 
-	target.on('pointerdown', (event: FederatedPointerEvent) => {
+	const onPointerDown = (event: FederatedPointerEvent) => {
 		isDragging = true;
 		longPressFired = false;
 		dragStartFired = false;
@@ -125,9 +135,9 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 				}
 			}, LONG_PRESS_DURATION);
 		}
-	});
+	};
 
-	target.on('globalpointermove', (event: FederatedPointerEvent) => {
+	const onPointerMove = (event: FederatedPointerEvent) => {
 		if (!isDragging) return;
 
 		// Check if movement exceeds long-press threshold
@@ -156,9 +166,9 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 		target.y = worldY - offsetY;
 
 		options.onDragMove?.(target.x, target.y);
-	});
+	};
 
-	function endDrag() {
+	const endDrag = () => {
 		if (longPressTimer) {
 			clearTimeout(longPressTimer);
 			longPressTimer = null;
@@ -171,10 +181,20 @@ export function makeDraggable(target: Container, options: DragDropOptions = {}) 
 		isDragging = false;
 		target.cursor = CURSOR_GRAB;
 		options.onDragEnd?.(target.x, target.y);
-	}
+	};
 
+	target.on('pointerdown', onPointerDown);
+	target.on('globalpointermove', onPointerMove);
 	target.on('pointerup', endDrag);
 	target.on('pointerupoutside', endDrag);
+
+	return () => {
+		endDrag();
+		target.off('pointerdown', onPointerDown);
+		target.off('globalpointermove', onPointerMove);
+		target.off('pointerup', endDrag);
+		target.off('pointerupoutside', endDrag);
+	};
 }
 
 /**

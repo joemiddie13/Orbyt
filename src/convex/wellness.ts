@@ -105,7 +105,7 @@ export const gatherSocialData = internalQuery({
 					.withIndex("by_creator_type", (q) =>
 						q.eq("creatorId", uuid).eq("type", "beacon")
 					)
-					.collect();
+					.take(50);
 				return objects
 					.filter((o) => o._creationTime > thirtyDaysAgo)
 					.map((o) => ({

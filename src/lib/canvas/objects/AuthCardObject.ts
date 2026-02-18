@@ -29,6 +29,7 @@ export class AuthCardObject {
 	private dividers: Graphics[] = [];
 	private entranceTl: gsap.core.Timeline | null = null;
 	private floatTween: gsap.core.Tween | null = null;
+	private dragCleanup: (() => void) | null = null;
 
 	constructor(x: number, y: number) {
 		this.cardWidth = CARD_WIDTH;
@@ -105,7 +106,7 @@ export class AuthCardObject {
 		this.spawnParticles(14);
 
 		// ── Draggable ──────────────────────────────────────────────────
-		makeDraggable(this.container, {
+		this.dragCleanup = makeDraggable(this.container, {
 			onDragStart: () => {
 				// Kill the float tween so it doesn't fight the drag
 				if (this.floatTween) {
@@ -316,6 +317,7 @@ export class AuthCardObject {
 	}
 
 	destroy() {
+		this.dragCleanup?.();
 		this.killAllTweens();
 	}
 }

@@ -49,12 +49,10 @@ export const createSharedCanvas = mutation({
 			args.inviteUuids.map(async (inviteeUuid) => {
 				const [fwd, rev] = await Promise.all([
 					ctx.db.query("friendships")
-						.withIndex("by_pair", (q) => q.eq("requesterId", user.uuid).eq("receiverId", inviteeUuid))
-						.filter((q) => q.eq(q.field("status"), "accepted"))
+						.withIndex("by_pair_status", (q) => q.eq("requesterId", user.uuid).eq("receiverId", inviteeUuid).eq("status", "accepted"))
 						.first(),
 					ctx.db.query("friendships")
-						.withIndex("by_pair", (q) => q.eq("requesterId", inviteeUuid).eq("receiverId", user.uuid))
-						.filter((q) => q.eq(q.field("status"), "accepted"))
+						.withIndex("by_pair_status", (q) => q.eq("requesterId", inviteeUuid).eq("receiverId", user.uuid).eq("status", "accepted"))
 						.first(),
 				]);
 				return { inviteeUuid, isFriend: !!(fwd || rev) };

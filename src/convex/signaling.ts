@@ -111,7 +111,7 @@ export const cleanupStaleSignals = internalMutation({
 		const stale = await ctx.db
 			.query("signalingMessages")
 			.withIndex("by_created", (q) => q.lt("createdAt", cutoff))
-			.collect();
+			.take(1000);
 
 		await Promise.all(stale.map((signal) => ctx.db.delete(signal._id)));
 

@@ -81,6 +81,8 @@ export class MusicObject {
 	private playing = false;
 	private platformColor: number;
 	private cleanupHover: (() => void) | null = null;
+	private dragCleanup: (() => void) | null = null;
+	private longPressCleanup: (() => void) | null = null;
 
 	constructor(content: MusicContent, x: number, y: number, options: MusicObjectOptions = {}) {
 		this.objectId = options.objectId;
@@ -268,7 +270,7 @@ export class MusicObject {
 
 		// ── Interactions ────────────────────────────────────────────────
 		if (options.editable !== false) {
-			makeDraggable(this.container, {
+			this.dragCleanup = makeDraggable(this.container, {
 				onDragStart: () => {
 					if (this.objectId && options.onDragStart) options.onDragStart(this.objectId);
 				},
@@ -283,7 +285,7 @@ export class MusicObject {
 				},
 			});
 		} else if (options.onLongPress) {
-			makeLongPressable(this.container, (sx, sy) => {
+			this.longPressCleanup = makeLongPressable(this.container, (sx, sy) => {
 				if (this.objectId) options.onLongPress!(this.objectId, sx, sy);
 			});
 		}
@@ -379,6 +381,8 @@ export class MusicObject {
 
 	/** Kill all running GSAP tweens — call before removal */
 	destroy() {
+		this.dragCleanup?.();
+		this.longPressCleanup?.();
 		this.cleanupHover?.();
 		gsap.killTweensOf(this.container);
 		gsap.killTweensOf(this.container.scale);

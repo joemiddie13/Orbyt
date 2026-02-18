@@ -39,7 +39,7 @@ export const addSticker = mutation({
 		const existingStickers = await ctx.db
 			.query("stickerReactions")
 			.withIndex("by_object", (q) => q.eq("objectId", args.objectId))
-			.collect();
+			.take(100);
 		const userStickers = existingStickers.filter((s) => s.userId === user.uuid);
 		if (userStickers.length >= MAX_STICKERS_PER_USER) {
 			throw new Error(`Max ${MAX_STICKERS_PER_USER} stickers per object`);

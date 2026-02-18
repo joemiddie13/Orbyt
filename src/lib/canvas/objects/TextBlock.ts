@@ -86,6 +86,8 @@ export class TextBlock {
 	/** Pending RAF ID for height check — cancelled on destroy to prevent callbacks on dead containers */
 	private pendingRAF: number | null = null;
 	private cleanupHover: (() => void) | null = null;
+	private dragCleanup: (() => void) | null = null;
+	private longPressCleanup: (() => void) | null = null;
 
 	/** User-set minimum height (0 = auto-fit to text only) */
 	private userHeight = 0;
@@ -185,7 +187,7 @@ export class TextBlock {
 
 		// Owner: full drag + long-press. Visitor: long-press only (sticker reactions).
 		if (options.editable !== false) {
-			makeDraggable(this.container, {
+			this.dragCleanup = makeDraggable(this.container, {
 				onDragStart: () => {
 					this.animateDragLift();
 					if (this.objectId && options.onDragStart) {
@@ -210,7 +212,7 @@ export class TextBlock {
 				},
 			});
 		} else if (options.onLongPress) {
-			makeLongPressable(this.container, (screenX, screenY) => {
+			this.longPressCleanup = makeLongPressable(this.container, (screenX, screenY) => {
 				if (this.objectId) options.onLongPress!(this.objectId, screenX, screenY);
 			});
 		}
@@ -635,6 +637,8 @@ export class TextBlock {
 
 	/** Kill all running GSAP tweens and pending RAF on this object — call before removal */
 	destroy() {
+		this.dragCleanup?.();
+		this.longPressCleanup?.();
 		if (this.pendingRAF !== null) {
 			cancelAnimationFrame(this.pendingRAF);
 			this.pendingRAF = null;

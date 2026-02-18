@@ -105,6 +105,8 @@ export class BeaconObject {
 	// Response dots
 	private responseDots: Graphics | null = null;
 	private cleanupHover: (() => void) | null = null;
+	private dragCleanup: (() => void) | null = null;
+	private longPressCleanup: (() => void) | null = null;
 
 	constructor(content: BeaconContent, x: number, y: number, options: BeaconObjectOptions = {}) {
 		this.objectId = options.objectId;
@@ -335,7 +337,7 @@ export class BeaconObject {
 
 		// --- Interactions ---
 		if (options.editable !== false) {
-			makeDraggable(this.container, {
+			this.dragCleanup = makeDraggable(this.container, {
 				onDragEnd: (finalX, finalY) => {
 					if (this.objectId && options.onDragEnd) {
 						options.onDragEnd(this.objectId, finalX, finalY);
@@ -353,7 +355,7 @@ export class BeaconObject {
 				},
 			});
 		} else if (options.onLongPress) {
-			makeLongPressable(this.container, (screenX, screenY) => {
+			this.longPressCleanup = makeLongPressable(this.container, (screenX, screenY) => {
 				if (this.objectId) options.onLongPress!(this.objectId, screenX, screenY);
 			});
 		}
@@ -643,6 +645,8 @@ export class BeaconObject {
 	/** Stop all tweens, animations, and clean up before removal */
 	destroy() {
 		this.isDestroyed = true;
+		this.dragCleanup?.();
+		this.longPressCleanup?.();
 		// Remove ticker FIRST to prevent updateHalftone() from accessing destroyed sprites
 		if (this.animTick) {
 			gsap.ticker.remove(this.animTick);

@@ -132,7 +132,7 @@ export const cleanupStalePresence = internalMutation({
 		const stale = await ctx.db
 			.query("canvasPresence")
 			.withIndex("by_last_seen", (q) => q.lt("lastSeen", cutoff))
-			.collect();
+			.take(1000);
 
 		await Promise.all(stale.map((record) => ctx.db.delete(record._id)));
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Astrophage is a non-addictive social connection platform. The entire UI is a PixiJS canvas — there are no traditional HTML pages or feeds. Users place objects on bounded canvases, create beacons (spontaneous/planned events), and connect in real life. Philosophy: open, see your people, make plans, close.
+Orbyt is a non-addictive social connection platform. The entire UI is a PixiJS canvas — there are no traditional HTML pages or feeds. Users place objects on bounded canvases, create beacons (spontaneous/planned events), and connect in real life. Philosophy: open, see your people, make plans, close.
 
 ## Commands
 

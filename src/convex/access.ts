@@ -52,15 +52,13 @@ export const grantAccess = mutation({
 			throw new Error("Only the canvas owner can invite people");
 		}
 
-		// Verify target is a friend (parallel lookup)
+		// Verify target is a friend (compound index — no post-filter)
 		const [forwardFriendship, reverseFriendship] = await Promise.all([
 			ctx.db.query("friendships")
-				.withIndex("by_pair", (q) => q.eq("requesterId", user.uuid).eq("receiverId", args.targetUuid))
-				.filter((q) => q.eq(q.field("status"), "accepted"))
+				.withIndex("by_pair_status", (q) => q.eq("requesterId", user.uuid).eq("receiverId", args.targetUuid).eq("status", "accepted"))
 				.first(),
 			ctx.db.query("friendships")
-				.withIndex("by_pair", (q) => q.eq("requesterId", args.targetUuid).eq("receiverId", user.uuid))
-				.filter((q) => q.eq(q.field("status"), "accepted"))
+				.withIndex("by_pair_status", (q) => q.eq("requesterId", args.targetUuid).eq("receiverId", user.uuid).eq("status", "accepted"))
 				.first(),
 		]);
 
