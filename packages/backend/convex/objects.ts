@@ -34,6 +34,27 @@ const beaconContent = v.object({
 	directBeaconGroupId: v.optional(v.string()),
 });
 
+/** Get a single canvas object by ID (auth + access check) */
+export const getById = query({
+	args: { id: v.id("canvasObjects") },
+	handler: async (ctx, args) => {
+		const user = await getAuthenticatedUser(ctx).catch(() => null);
+		if (!user) return null;
+
+		const obj = await ctx.db.get(args.id);
+		if (!obj) return null;
+
+		// Verify caller has access to the object's canvas
+		try {
+			await checkCanvasAccess(ctx, obj.canvasId, user.uuid, "viewer");
+		} catch {
+			return null;
+		}
+
+		return obj;
+	},
+});
+
 /** Get all objects on a canvas (auth + access check) */
 export const getByCanvas = query({
 	args: { canvasId: v.id("canvases") },
@@ -69,9 +90,19 @@ export const getByCanvas = query({
 			.withIndex("by_canvas", (q) => q.eq("canvasId", args.canvasId))
 			.collect();
 
+		// Filter out private beacons the viewer isn't invited to
+		const isOwner = canvas.ownerId === user.uuid;
+		const visible = objects.filter((obj) => {
+			if (obj.type !== "beacon") return true;
+			const content = obj.content as { visibilityType?: string; directRecipients?: string[] };
+			if (content.visibilityType !== "direct") return true;
+			if (isOwner || obj.creatorId === user.uuid) return true;
+			return content.directRecipients?.includes(user.uuid) ?? false;
+		});
+
 		// Resolve storage URLs for photo objects
 		return Promise.all(
-			objects.map(async (obj) => {
+			visible.map(async (obj) => {
 				if (obj.type === "photo") {
 					const content = obj.content as { storageId: string; caption?: string; rotation: number };
 					const imageUrl = await ctx.storage.getUrl(content.storageId as Id<"_storage">);

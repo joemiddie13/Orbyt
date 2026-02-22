@@ -21,37 +21,38 @@ const STATUS_CONFIG: Record<Status, { label: string; emoji: string; color: strin
 
 function formatDateTime(ts: number): string {
   const d = new Date(ts);
-  return d.toLocaleDateString([], {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const date = d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+
+  if (isToday) return `Today at ${time}`;
+  if (isTomorrow) return `Tomorrow at ${time}`;
+  return `${date} at ${time}`;
 }
+
+type BeaconContent = {
+  title?: string;
+  description?: string;
+  locationAddress?: string;
+  startTime?: number;
+  endTime?: number;
+};
 
 export default function BeaconDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const beaconId = id as Id<"canvasObjects">;
 
+  const beacon = useQuery(api.objects.getById, { id: beaconId });
   const responses = useQuery(api.responses.getByBeacon, { beaconId });
   const respond = useMutation(api.responses.respond);
   const removeResponse = useMutation(api.responses.removeResponse);
 
-  // We need the beacon object itself for its content
-  // Since there's no direct getById query, we'll get it from the responses context
-  // Actually, let's get it from the canvas objects
-  // For now, we'll use a simpler approach: the beacon content comes from the list screen
-
-  // Get the beacon data by querying the object directly isn't exposed as a query,
-  // so we use a pattern: query getActiveBeacons for all canvases and find this one.
-  // Better approach: add a getById query. For MVP, we'll show responses and RSVP.
-
   const handleRSVP = async (status: Status) => {
-    // Check if user already has this status — toggle off
-    const myResponse = responses?.find((r) => r.userId && r.status === status);
-    // Actually we need to check by the current user, which we don't directly have here.
-    // The mutation handles upsert, so just call it. Toggle by calling removeResponse.
     try {
       await respond({ beaconId, status });
     } catch (e: any) {
@@ -67,13 +68,15 @@ export default function BeaconDetailScreen() {
     }
   };
 
-  if (responses === undefined) {
+  if (beacon === undefined || responses === undefined) {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator color="#fbbf24" size="large" />
       </View>
     );
   }
+
+  const content = (beacon?.content ?? {}) as BeaconContent;
 
   // Group responses by status
   const grouped: Record<Status, typeof responses> = {
@@ -84,6 +87,31 @@ export default function BeaconDetailScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Beacon info */}
+      <View style={styles.beaconHeader}>
+        <Text style={styles.beaconTitle}>{content.title ?? "Beacon"}</Text>
+        {content.description && (
+          <Text style={styles.beaconDescription}>{content.description}</Text>
+        )}
+        <View style={styles.detailsRow}>
+          {content.startTime && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>When</Text>
+              <Text style={styles.detailValue}>
+                {formatDateTime(content.startTime)}
+                {content.endTime ? ` — ${formatDateTime(content.endTime)}` : ""}
+              </Text>
+            </View>
+          )}
+          {content.locationAddress && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Where</Text>
+              <Text style={styles.detailValue}>📍 {content.locationAddress}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
       {/* RSVP Buttons */}
       <Text style={styles.sectionTitle}>Your RSVP</Text>
       <View style={styles.rsvpRow}>
@@ -156,6 +184,42 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     gap: 16,
+  },
+  beaconHeader: {
+    backgroundColor: "#1a1a2e",
+    borderRadius: 14,
+    padding: 20,
+    gap: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: "#fbbf24",
+  },
+  beaconTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fbbf24",
+  },
+  beaconDescription: {
+    fontSize: 15,
+    color: "#e8e0d4",
+    lineHeight: 22,
+  },
+  detailsRow: {
+    gap: 10,
+    marginTop: 6,
+  },
+  detailItem: {
+    gap: 2,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#666",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: "#e8e0d4",
   },
   sectionTitle: {
     fontSize: 16,

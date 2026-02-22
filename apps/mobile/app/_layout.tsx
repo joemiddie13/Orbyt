@@ -73,6 +73,10 @@ function RootLayoutNav() {
         name="beacon/[id]"
         options={{ title: "Beacon", presentation: "card" }}
       />
+      <Stack.Screen
+        name="beacon/create"
+        options={{ title: "New Beacon", presentation: "modal" }}
+      />
     </Stack>
   );
 }

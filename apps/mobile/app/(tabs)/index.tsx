@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import {
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { api } from "@backend/_generated/api";
 import type { Id } from "@backend/_generated/dataModel";
 
@@ -36,17 +37,8 @@ type BeaconContent = {
   endTime?: number;
 };
 
-/**
- * Beacon list for a single canvas.
- * Each canvas gets its own query so Convex reactivity works per-canvas.
- */
-function CanvasBeaconList({
-  canvasId,
-  canvasLabel,
-}: {
-  canvasId: Id<"canvases">;
-  canvasLabel?: string;
-}) {
+/** Beacon list for a single canvas */
+function CanvasBeaconList({ canvasId }: { canvasId: Id<"canvases"> }) {
   const router = useRouter();
   const beacons = useQuery(api.beacons.getActiveBeacons, { canvasId });
 
@@ -57,6 +49,7 @@ function CanvasBeaconList({
     .map((b) => ({
       _id: b._id,
       content: b.content as BeaconContent,
+      creatorName: b.creatorName,
     }))
     .sort((a, b) => (a.content.startTime ?? 0) - (b.content.startTime ?? 0));
 
@@ -73,6 +66,7 @@ function CanvasBeaconList({
           ]}
           onPress={() => router.push(`/beacon/${item._id}`)}
         >
+          <Text style={styles.beaconCreator}>{item.creatorName}</Text>
           <Text style={styles.beaconTitle}>
             {item.content.title ?? "Beacon"}
           </Text>
@@ -98,51 +92,73 @@ function CanvasBeaconList({
 }
 
 export default function BeaconsScreen() {
+  const router = useRouter();
   const canvases = useQuery(api.access.getAccessibleCanvases);
+
+  // Friends' beacons only — filter out canvases you own
+  const friendCanvases = useMemo(
+    () => canvases?.filter((c) => c.role !== "owner") ?? [],
+    [canvases]
+  );
 
   if (canvases === undefined) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator color="#fbbf24" size="large" />
+      <View style={styles.wrapper}>
+        <View style={[styles.container, styles.centered]}>
+          <ActivityIndicator color="#fbbf24" size="large" />
+        </View>
+        <FAB onPress={() => router.push("/beacon/create")} />
       </View>
     );
   }
 
-  if (canvases.length === 0) {
+  if (friendCanvases.length === 0) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <Text style={styles.emptyIcon}>⚡</Text>
-        <Text style={styles.emptyTitle}>No canvases yet</Text>
-        <Text style={styles.emptySubtitle}>
-          Add friends on the web app to see their beacons here
-        </Text>
+      <View style={styles.wrapper}>
+        <View style={[styles.container, styles.centered]}>
+          <Text style={styles.emptyIcon}>⚡</Text>
+          <Text style={styles.emptyTitle}>No friend beacons</Text>
+          <Text style={styles.emptySubtitle}>
+            When friends create beacons, they'll show up here
+          </Text>
+        </View>
+        <FAB onPress={() => router.push("/beacon/create")} />
       </View>
     );
   }
 
   return (
-    <FlatList
-      style={styles.container}
-      data={canvases}
-      keyExtractor={(item) => item._id}
-      contentContainerStyle={styles.listContent}
-      ListEmptyComponent={
-        <View style={styles.centered}>
-          <Text style={styles.emptyIcon}>⚡</Text>
-          <Text style={styles.emptyTitle}>No active beacons</Text>
-          <Text style={styles.emptySubtitle}>
-            When friends create beacons, they'll show up here
-          </Text>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <CanvasBeaconList canvasId={item._id} />
-      )}
-    />
+    <View style={styles.wrapper}>
+      <FlatList
+        style={styles.container}
+        data={friendCanvases}
+        keyExtractor={(item) => item._id}
+        contentContainerStyle={styles.listContent}
+        renderItem={({ item }) => (
+          <CanvasBeaconList canvasId={item._id} />
+        )}
+      />
+      <FAB onPress={() => router.push("/beacon/create")} />
+    </View>
+  );
+}
+
+function FAB({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+      onPress={onPress}
+    >
+      <FontAwesome name="plus" size={22} color="#0a0a1a" />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    backgroundColor: "#0a0a1a",
+  },
   container: {
     flex: 1,
     backgroundColor: "#0a0a1a",
@@ -187,6 +203,11 @@ const styles = StyleSheet.create({
   beaconCardPressed: {
     opacity: 0.7,
   },
+  beaconCreator: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#999",
+  },
   beaconTitle: {
     fontSize: 18,
     fontWeight: "bold",
@@ -204,5 +225,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#888",
     marginTop: 4,
+  },
+  fab: {
+    position: "absolute",
+    bottom: 24,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#fbbf24",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  fabPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.95 }],
   },
 });

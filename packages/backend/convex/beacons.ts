@@ -90,9 +90,31 @@ export const getActiveBeacons = query({
 			.withIndex("by_canvas", (q) => q.eq("canvasId", args.canvasId))
 			.collect();
 
-		return objects.filter(
-			(obj) => obj.type === "beacon" && (!obj.expiresAt || obj.expiresAt > Date.now())
+		const activeBeacons = objects.filter((obj) => {
+			if (obj.type !== "beacon") return false;
+			if (obj.expiresAt && obj.expiresAt <= Date.now()) return false;
+			// Hide private beacons from non-recipients
+			const content = obj.content as { visibilityType?: string; directRecipients?: string[] };
+			if (content.visibilityType !== "direct") return true;
+			if (obj.creatorId === user.uuid) return true;
+			return content.directRecipients?.includes(user.uuid) ?? false;
+		});
+
+		// Resolve creator display names
+		const creatorUuids = [...new Set(activeBeacons.map((b) => b.creatorId))];
+		const creators = await Promise.all(
+			creatorUuids.map((uuid) =>
+				ctx.db.query("users").withIndex("by_uuid", (q) => q.eq("uuid", uuid)).first()
+			)
 		);
+		const creatorMap = new Map(
+			creators.filter(Boolean).map((u) => [u!.uuid, u!.displayName ?? u!.username])
+		);
+
+		return activeBeacons.map((b) => ({
+			...b,
+			creatorName: creatorMap.get(b.creatorId) ?? "Unknown",
+		}));
 	},
 });
 
@@ -150,6 +172,84 @@ export const backfillBeaconGroupIds = internalMutation({
 			}
 		}
 		return { patched };
+	},
+});
+
+/** Create a beacon on the caller's personal canvas */
+export const createMyBeacon = mutation({
+	args: {
+		title: v.string(),
+		description: v.optional(v.string()),
+		locationAddress: v.optional(v.string()),
+		startTime: v.number(),
+		endTime: v.number(),
+		recipientUuids: v.optional(v.array(v.string())),
+	},
+	handler: async (ctx, args) => {
+		const user = await getAuthenticatedUser(ctx);
+
+		validateBeaconContent({ title: args.title, description: args.description, locationAddress: args.locationAddress });
+		validateBeaconTiming(args.startTime, args.endTime);
+
+		const isDirect = args.recipientUuids && args.recipientUuids.length > 0;
+
+		if (isDirect) {
+			if (args.recipientUuids!.length > 50) {
+				throw new Error("Max 50 recipients per beacon");
+			}
+			// Validate all recipients are friends
+			await Promise.all(args.recipientUuids!.map(async (recipientUuid) => {
+				const [fwd, rev] = await Promise.all([
+					ctx.db.query("friendships")
+						.withIndex("by_pair_status", (q) => q.eq("requesterId", user.uuid).eq("receiverId", recipientUuid).eq("status", "accepted"))
+						.first(),
+					ctx.db.query("friendships")
+						.withIndex("by_pair_status", (q) => q.eq("requesterId", recipientUuid).eq("receiverId", user.uuid).eq("status", "accepted"))
+						.first(),
+				]);
+				if (!fwd && !rev) throw new Error("Can only send beacons to friends");
+			}));
+		}
+
+		// Rate limit: max 10 beacons per user per hour
+		const oneHourAgo = Date.now() - 60 * 60 * 1000;
+		const recentBeacons = await ctx.db
+			.query("canvasObjects")
+			.withIndex("by_creator_type", (q) => q.eq("creatorId", user.uuid).eq("type", "beacon"))
+			.filter((q) => q.gt(q.field("_creationTime"), oneHourAgo))
+			.collect();
+		if (recentBeacons.length >= 10) {
+			throw new Error("Rate limit: max 10 beacons per hour");
+		}
+
+		// Find the user's personal canvas
+		const canvas = await ctx.db
+			.query("canvases")
+			.withIndex("by_owner_type", (q) => q.eq("ownerId", user.uuid).eq("type", "personal"))
+			.first();
+		if (!canvas) throw new Error("Personal canvas not found");
+
+		const beaconContent = {
+			title: args.title,
+			description: args.description,
+			locationAddress: args.locationAddress,
+			startTime: args.startTime,
+			endTime: args.endTime,
+			visibilityType: isDirect ? "direct" as const : "canvas" as const,
+			directRecipients: isDirect ? args.recipientUuids : undefined,
+		};
+
+		const id = await ctx.db.insert("canvasObjects", {
+			canvasId: canvas._id,
+			creatorId: user.uuid,
+			type: "beacon",
+			position: { x: 300 + Math.random() * 500, y: 200 + Math.random() * 400 },
+			size: { w: 260, h: 100 },
+			content: beaconContent,
+			expiresAt: args.endTime,
+		});
+
+		return id;
 	},
 });
 

@@ -41,11 +41,19 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
 	return betterAuth({
 		baseURL: siteUrl,
 		database: authComponent.adapter(ctx),
-		trustedOrigins: [
-			"http://localhost:5173",
-			"https://orbyt.life",
-			"orbyt://",
-		],
+		trustedOrigins: async (request) => {
+			const origins = [
+				"http://localhost:5173",
+				"https://orbyt.life",
+				"orbyt://",
+			];
+			// Expo Go uses exp://IP:PORT during development — allow dynamically
+			const origin = request?.headers?.get?.("origin") ?? "";
+			if (origin.startsWith("exp://")) {
+				origins.push(origin);
+			}
+			return origins;
+		},
 		emailAndPassword: {
 			enabled: true,
 			requireEmailVerification: false,
