@@ -44,5 +44,6 @@ session-notes/
 *.mobileprovision
 *.orig.*
 
-# Convex generated
+# Convex generated (but allow the shared backend types for CI builds)
 _generated/
+!packages/backend/convex/_generated/

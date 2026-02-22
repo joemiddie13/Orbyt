@@ -3,8 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
-    "dev": "npx convex dev",
-    "build": "npx convex codegen"
+    "dev": "npx convex dev"
   },
   "dependencies": {
     "convex": "^1.31.7",
