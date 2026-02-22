@@ -4,35 +4,71 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Orbyt is a non-addictive social connection platform. The entire UI is a PixiJS canvas — there are no traditional HTML pages or feeds. Users place objects on bounded canvases, create beacons (spontaneous/planned events), and connect in real life. Philosophy: open, see your people, make plans, close.
+Orbyt is a non-addictive social connection platform. The web UI is a PixiJS canvas — there are no traditional HTML pages or feeds. Users place objects on bounded canvases, create beacons (spontaneous/planned events), and connect in real life. The mobile app (Expo/React Native) is a companion for beacons — view, RSVP, and respond on the go. Philosophy: open, see your people, make plans, close.
+
+## Monorepo Structure
+
+This is a Turborepo monorepo with npm workspaces:
+
+```
+astrophage/
+├── apps/
+│   ├── web/                   ← SvelteKit web app (PixiJS canvas UI)
+│   └── mobile/                ← Expo React Native app (Beacons MVP)
+├── packages/
+│   └── backend/               ← Convex functions (shared backend)
+├── turbo.json
+├── package.json               ← root workspace config
+└── CLAUDE.md
+```
 
 ## Commands
 
 ```bash
-npm run dev          # Vite dev server (http://localhost:5173)
-npm run build        # Production build (use for quick validation)
-npm run check        # Type check (svelte-kit sync + svelte-check)
-npm run check:watch  # Type check with live reload
-npx convex dev       # Convex dev server (run alongside Vite)
+# Root (runs all workspaces via Turborepo)
+npm run dev              # turbo run dev (all apps)
+npm run build            # turbo run build (all apps)
+
+# Web app (from apps/web/ or with --filter)
+cd apps/web && npm run dev       # Vite dev server (http://localhost:5173)
+cd apps/web && npm run build     # Production build
+cd apps/web && npm run check     # Type check
+
+# Mobile app (from apps/mobile/)
+cd apps/mobile && npx expo start       # Expo dev server
+cd apps/mobile && npx expo start --ios # iOS simulator
+
+# Backend (from packages/backend/)
+cd packages/backend && npx convex dev  # Convex dev server
 ```
 
 No test framework is configured yet.
 
 ## Tech Stack
 
+### Web (`apps/web/`)
 - **SvelteKit** (Svelte 5 with `$props()` syntax) + TypeScript strict mode
 - **PixiJS v8** — WebGL canvas rendering. Requires async `app.init()`.
-- **Tailwind CSS v4** — Uses `@import "tailwindcss"` in app.css, `@tailwindcss/vite` plugin in vite.config.ts
+- **Tailwind CSS v4** — Uses `@import "tailwindcss"` in app.css, `@tailwindcss/vite` plugin
 - **Motion** — DOM/UI animations (vanilla JS API, not React). Use `animate`, `spring` from `motion`.
-- **tween.js** — Canvas object animations inside PixiJS render loop
-- **Convex** — Backend (database, real-time sync, serverless functions). Functions in `src/convex/`.
-- **Better Auth** — Username/password authentication via `@convex-dev/better-auth` adapter
+- **GSAP** — Canvas object animations inside PixiJS render loop
+
+### Mobile (`apps/mobile/`)
+- **Expo** (React Native) with expo-router file-based routing
+- **React 19** + TypeScript strict mode
+- **Better Auth Expo client** — `@better-auth/expo` with `expo-secure-store` for token persistence
+- **Convex React** — `ConvexReactClient` + `ConvexBetterAuthProvider` for real-time queries
+
+### Shared (`packages/backend/`)
+- **Convex** — Backend (database, real-time sync, serverless functions)
+- **Better Auth** — Username/password auth with `expo()` plugin for mobile support
+- Functions in `packages/backend/convex/`, configured via `packages/backend/convex.json`
 
 ## Architecture
 
-### Canvas is the app
+### Canvas is the app (Web)
 
-The home page (`src/routes/+page.svelte`) mounts a full-screen PixiJS canvas. All user interaction happens on this canvas. The `CanvasRenderer` class (`src/lib/canvas/CanvasRenderer.ts`) owns the PixiJS `Application` and a `world` Container.
+The home page (`apps/web/src/routes/+page.svelte`) mounts a full-screen PixiJS canvas. All user interaction happens on this canvas. The `CanvasRenderer` class (`apps/web/src/lib/canvas/CanvasRenderer.ts`) owns the PixiJS `Application` and a `world` Container.
 
 ### World container pattern
 
@@ -44,48 +80,58 @@ Object drag uses `event.stopPropagation()` so it doesn't trigger canvas pan. Dra
 
 ### Convex backend
 
-Functions live in `src/convex/` (not project root) because SvelteKit can't import outside `src/`. Configured via `convex.json` at project root. The `$convex` path alias in `svelte.config.js` allows `import { api } from '$convex/_generated/api'`.
+Functions live in `packages/backend/convex/`. The `$convex` path alias in `apps/web/svelte.config.js` points to `../../packages/backend/convex` so web app imports work as `import { api } from '$convex/_generated/api'`. Mobile app uses TypeScript path `@backend/*` mapped to `../../packages/backend/convex/*`.
 
 Environment variables are set on the Convex deployment via `npx convex env set KEY value`, accessed in Convex functions via `process.env.KEY` (requires `@types/node`).
 
 ### Auth flow
 
-Better Auth handles username/password auth. The Convex adapter (`@convex-dev/better-auth`) stores auth data in Convex tables. The community SvelteKit adapter (`@mmailaender/convex-better-auth-svelte`) bridges auth with SvelteKit hooks and routing.
+Better Auth handles username/password auth. The Convex adapter (`@convex-dev/better-auth`) stores auth data in Convex tables.
 
-**Auth abstraction layer** (`src/lib/auth/`): Components never import Better Auth directly. Only `authService.ts` knows about Better Auth. When migrating to AT Protocol, only that file changes.
+**Web**: The community SvelteKit adapter (`@mmailaender/convex-better-auth-svelte`) bridges auth with SvelteKit hooks and routing. Auth abstraction layer in `apps/web/src/lib/auth/` — components never import Better Auth directly.
 
-- `types.ts` — AuthUser, AuthState, SignUpParams, SignInParams interfaces
-- `authService.ts` — signUp, signIn, signOut (ONLY file that imports Better Auth)
-- `currentUser.svelte.ts` — Svelte 5 reactive store for auth state
-- `index.ts` — barrel exports
+**Mobile**: `@better-auth/expo` client with `expo-secure-store` for token persistence. `ConvexBetterAuthProvider` wraps the app. Auth guard hook redirects to `/auth` screen when unauthenticated.
 
-**Auth token timing**: Convex queries run before the auth token is set on the client, so `getCurrentUser` briefly returns `null`. The page uses a two-phase approach: an `$effect` catches authenticated state instantly, with a 1500ms timeout fallback for genuinely logged-out users.
+**Auth token timing**: Convex queries run before the auth token is set on the client, so `getCurrentUser` briefly returns `null`. Both web and mobile use retry with backoff for `createUser` after signup.
+
+### Mobile app architecture
+
+Expo Router file-based routing:
+- `app/_layout.tsx` — Root layout with Convex + BetterAuth providers, auth guard
+- `app/auth.tsx` — Sign in / sign up modal screen
+- `app/(tabs)/index.tsx` — Beacon list (queries all accessible canvases for active beacons)
+- `app/(tabs)/profile.tsx` — User profile + sign out
+- `app/beacon/[id].tsx` — Beacon detail with RSVP buttons and response list
+
+Metro bundler configured for monorepo with `watchFolders` and `nodeModulesPaths`.
 
 ### Reactive data flow
 
-User signs in → `getCurrentUser` returns auth user → `getByAuthAccount` finds Astrophage user → `getPersonalCanvas` finds their canvas → `getByCanvas` loads objects → `CanvasRenderer.syncObjects()` reconciles with PixiJS visuals. All queries are reactive via Convex WebSocket — changes propagate automatically across tabs.
+User signs in → `getCurrentUser` returns auth user → `getByAuthAccount` finds Astrophage user → `getPersonalCanvas` finds their canvas → `getByCanvas` loads objects → `CanvasRenderer.syncObjects()` reconciles with PixiJS visuals. All queries are reactive via Convex WebSocket — changes propagate automatically across tabs and between web/mobile.
 
 ### Key classes and files
 
 | Class/File | Location | Responsibility |
 |------------|----------|---------------|
-| `CanvasRenderer` | `src/lib/canvas/CanvasRenderer.ts` | PixiJS app init, world container, object reconciliation (`syncObjects`) |
-| `PanZoom` | `src/lib/canvas/interactions/PanZoom.ts` | Click-drag pan with momentum/inertia, scroll-wheel zoom, rubber-band edges |
-| `DragDrop` | `src/lib/canvas/interactions/DragDrop.ts` | `makeDraggable(target, options)` — draggable with `onDragEnd` callback |
-| `TextBlock` | `src/lib/canvas/objects/TextBlock.ts` | Sticky-note with rich text (HTMLText), 8-direction resize, auto-height |
-| `BeaconObject` | `src/lib/canvas/objects/BeaconObject.ts` | Beacon with pulse animation, destroy() for tween cleanup |
-| `PhotoObject` | `src/lib/canvas/objects/PhotoObject.ts` | Polaroid-style photo: white frame, tilt, shadow, center-cropped image |
-| `StickerReaction` | `src/lib/canvas/objects/StickerReaction.ts` | Emoji sticker attached to parent object container |
-| `PeerManager` | `src/lib/webrtc/PeerManager.ts` | WebRTC peer connections per canvas — cursor presence, drag streaming |
-| `AuthModal` | `src/lib/components/AuthModal.svelte` | Sign up / sign in overlay on canvas |
-| `CanvasToolbar` | `src/lib/components/CanvasToolbar.svelte` | Floating bar: Add Note/Beacon/Photo, sign out, username |
-| `schema.ts` | `src/convex/schema.ts` | Database schema: 9 tables with compound indexes |
-| `auth.ts` | `src/convex/auth.ts` | Better Auth factory + `getCurrentUser` query |
-| `users.ts` | `src/convex/users.ts` | `createUser` (UUID + personal canvas), user queries, `getAuthenticatedUser` helper |
-| `objects.ts` | `src/convex/objects.ts` | Canvas object CRUD with position/bounds validation |
-| `photos.ts` | `src/convex/photos.ts` | Photo upload (generateUploadUrl, createPhoto, updateCaption) |
-| `beacons.ts` | `src/convex/beacons.ts` | Beacon queries, direct beacons, expiration cleanup cron |
-| `access.ts` | `src/convex/access.ts` | RBAC: checkCanvasAccess, grantAccess, revokeAccess, getAccessibleCanvases |
+| `CanvasRenderer` | `apps/web/src/lib/canvas/CanvasRenderer.ts` | PixiJS app init, world container, object reconciliation (`syncObjects`) |
+| `PanZoom` | `apps/web/src/lib/canvas/interactions/PanZoom.ts` | Click-drag pan with momentum/inertia, scroll-wheel zoom, rubber-band edges |
+| `DragDrop` | `apps/web/src/lib/canvas/interactions/DragDrop.ts` | `makeDraggable(target, options)` — draggable with `onDragEnd` callback |
+| `TextBlock` | `apps/web/src/lib/canvas/objects/TextBlock.ts` | Sticky-note with rich text (HTMLText), 8-direction resize, auto-height |
+| `BeaconObject` | `apps/web/src/lib/canvas/objects/BeaconObject.ts` | Beacon with pulse animation, destroy() for tween cleanup |
+| `PhotoObject` | `apps/web/src/lib/canvas/objects/PhotoObject.ts` | Polaroid-style photo: white frame, tilt, shadow, center-cropped image |
+| `StickerReaction` | `apps/web/src/lib/canvas/objects/StickerReaction.ts` | Emoji sticker attached to parent object container |
+| `PeerManager` | `apps/web/src/lib/webrtc/PeerManager.ts` | WebRTC peer connections per canvas — cursor presence, drag streaming |
+| `AuthModal` | `apps/web/src/lib/components/AuthModal.svelte` | Sign up / sign in overlay on canvas |
+| `CanvasToolbar` | `apps/web/src/lib/components/CanvasToolbar.svelte` | Floating bar: Add Note/Beacon/Photo, sign out, username |
+| `schema.ts` | `packages/backend/convex/schema.ts` | Database schema: 9 tables with compound indexes |
+| `auth.ts` | `packages/backend/convex/auth.ts` | Better Auth factory + `getCurrentUser` query + `expo()` plugin |
+| `users.ts` | `packages/backend/convex/users.ts` | `createUser` (UUID + personal canvas), user queries, `getAuthenticatedUser` helper |
+| `objects.ts` | `packages/backend/convex/objects.ts` | Canvas object CRUD with position/bounds validation |
+| `photos.ts` | `packages/backend/convex/photos.ts` | Photo upload (generateUploadUrl, createPhoto, updateCaption) |
+| `beacons.ts` | `packages/backend/convex/beacons.ts` | Beacon queries, direct beacons, expiration cleanup cron |
+| `access.ts` | `packages/backend/convex/access.ts` | RBAC: checkCanvasAccess, grantAccess, revokeAccess, getAccessibleCanvases |
+| `auth-client.ts` | `apps/mobile/src/lib/auth-client.ts` | Better Auth Expo client with SecureStore |
+| `useAuthGuard.ts` | `apps/mobile/src/hooks/useAuthGuard.ts` | Auth redirect hook for mobile |
 
 ### Canvas dimensions
 
@@ -101,19 +147,22 @@ Every Convex mutation validates:
 - **Authorization**: `checkCanvasAccess(ctx, canvasId, userUuid, minRole)` — RBAC check (viewer < member < owner)
 - **Input bounds**: Position within canvas (0–3000, 0–2000), string lengths capped, file types validated server-side
 - **Rate/spam limits**: Max 50 direct beacon recipients, max 5 stickers per user per object, beacon duration max 90 days
-- **CSP headers**: Configured in `src/hooks.server.ts` — `unsafe-inline`/`unsafe-eval` dev-only, Convex domains whitelisted
+- **CSP headers**: Configured in `apps/web/src/hooks.server.ts` — `unsafe-inline`/`unsafe-eval` dev-only, Convex domains whitelisted
+- **CORS**: Enabled on auth HTTP routes for Expo cross-origin requests
+- **Trusted origins**: `localhost:5173`, `orbyt.life`, `orbyt://` (Expo deep link scheme)
 
 ## Conventions
 
 - **Classes**: PascalCase files matching class name (`CanvasRenderer.ts`)
 - **Constants**: SCREAMING_SNAKE_CASE at module scope
-- **Colors**: PixiJS hex format `0xRRGGBB`
+- **Colors**: PixiJS hex format `0xRRGGBB` (web), CSS hex strings `#RRGGBB` (mobile)
 - **Comments**: Explain "why", not "what". JSDoc on classes and public methods.
 - **Composition over inheritance**: Objects built by combining PixiJS primitives (Container + Graphics + Text)
-- **No separate auth pages**: Auth is a modal overlay on the canvas
-- **Auth abstraction**: Components must never call Better Auth or Convex auth directly — use `$lib/auth`
+- **No separate auth pages** (web): Auth is a modal overlay on the canvas
+- **Auth abstraction** (web): Components must never call Better Auth or Convex auth directly — use `$lib/auth`
 - **Portable user IDs**: Use platform-agnostic UUIDs as canonical identifiers, not Convex `_id`
 - **No email required**: Username-only signup. Placeholder email generated internally (`username@astrophage.local`).
+- **Workspace deps**: Shared backend imported as `@orbyt/backend` workspace dependency
 
 ## Design Principles (Non-Negotiable)
 
@@ -140,4 +189,8 @@ Every Convex mutation validates:
 
 **Security hardened**: Two full audit passes — RBAC on all mutations, input validation, indexed queries, server-side upload validation, spam prevention.
 
-**Next**: Music link cards, Rive animations + polish, demo prep.
+**Monorepo restructure complete**: Turborepo with npm workspaces. Convex backend extracted to `packages/backend/`. Web app moved to `apps/web/`. Expo mobile app scaffolded in `apps/mobile/`.
+
+**Mobile app MVP**: Auth (sign in/up), beacon list, beacon detail with RSVP, profile + sign out. Shares the same Convex backend — real-time sync between web and mobile.
+
+**Next**: Test mobile on device, polish mobile UI, beacon creation on mobile, Rive animations + polish, demo prep.

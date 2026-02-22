@@ -1,0 +1,16 @@
+{
+  "name": "@orbyt/backend",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "npx convex dev"
+  },
+  "dependencies": {
+    "convex": "^1.31.7",
+    "@convex-dev/better-auth": "^0.10.10",
+    "better-auth": "^1.4.9",
+    "@better-auth/passkey": "^1.4.9",
+    "@better-auth/expo": "^1.4.9",
+    "@types/node": "^25.2.3"
+  }
+}

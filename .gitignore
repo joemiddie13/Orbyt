@@ -5,8 +5,12 @@ node_modules
 .vercel
 .netlify
 .wrangler
-/.svelte-kit
+.svelte-kit
 /build
+dist
+
+# Turborepo
+.turbo
 
 # OS
 .DS_Store
@@ -30,3 +34,15 @@ session-notes/
 
 # Playwright MCP
 .playwright-mcp/
+
+# Expo
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Convex generated
+_generated/

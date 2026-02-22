@@ -6,6 +6,7 @@ import { query } from "./_generated/server";
 import { betterAuth } from "better-auth/minimal";
 import { username } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
+import { expo } from "@better-auth/expo";
 import authConfig from "./auth.config";
 
 export const authComponent = createClient<DataModel>(components.betterAuth);
@@ -23,6 +24,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
 				return /^[a-zA-Z0-9_-]{3,30}$/.test(username);
 			},
 		}),
+		expo(),
 	];
 
 	if (siteUrl) {
@@ -42,6 +44,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
 		trustedOrigins: [
 			"http://localhost:5173",
 			"https://orbyt.life",
+			"orbyt://",
 		],
 		emailAndPassword: {
 			enabled: true,
