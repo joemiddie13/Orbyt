@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow-soft">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Deep space background -->
+  <rect width="1200" height="630" fill="#0a0a1a"/>
+
+  <!-- Scattered star dots for atmosphere -->
+  <circle cx="80" cy="45" r="1.2" fill="#ffffff" opacity="0.6"/>
+  <circle cx="200" cy="120" r="0.8" fill="#ffffff" opacity="0.4"/>
+  <circle cx="150" cy="520" r="1.0" fill="#ffffff" opacity="0.5"/>
+  <circle cx="320" cy="80" r="0.7" fill="#ffffff" opacity="0.3"/>
+  <circle cx="450" cy="560" r="1.1" fill="#ffffff" opacity="0.45"/>
+  <circle cx="550" cy="50" r="0.9" fill="#ffffff" opacity="0.35"/>
+  <circle cx="700" cy="590" r="1.0" fill="#ffffff" opacity="0.5"/>
+  <circle cx="850" cy="40" r="1.3" fill="#ffffff" opacity="0.55"/>
+  <circle cx="950" cy="100" r="0.8" fill="#ffffff" opacity="0.4"/>
+  <circle cx="1050" cy="70" r="1.0" fill="#ffffff" opacity="0.45"/>
+  <circle cx="1130" cy="180" r="0.7" fill="#ffffff" opacity="0.3"/>
+  <circle cx="1100" cy="520" r="1.1" fill="#ffffff" opacity="0.5"/>
+  <circle cx="980" cy="570" r="0.9" fill="#ffffff" opacity="0.4"/>
+  <circle cx="60" cy="300" r="0.8" fill="#ffffff" opacity="0.35"/>
+  <circle cx="1160" cy="350" r="1.0" fill="#ffffff" opacity="0.45"/>
+  <circle cx="300" cy="200" r="0.6" fill="#ffffff" opacity="0.3"/>
+  <circle cx="750" cy="130" r="0.9" fill="#ffffff" opacity="0.4"/>
+  <circle cx="400" cy="400" r="0.7" fill="#ffffff" opacity="0.35"/>
+  <circle cx="1080" cy="430" r="1.2" fill="#ffffff" opacity="0.5"/>
+  <circle cx="180" cy="380" r="0.8" fill="#ffffff" opacity="0.3"/>
+  <circle cx="620" cy="580" r="0.6" fill="#ffffff" opacity="0.25"/>
+  <circle cx="880" cy="480" r="1.0" fill="#ffffff" opacity="0.4"/>
+
+  <!-- Orbyt logo — centered at x=380, y=315 (left-center area) -->
+  <!-- Circular O -->
+  <circle cx="380" cy="290" r="70" fill="none" stroke="url(#amber)" stroke-width="12" filter="url(#glow)"/>
+  <!-- Tilted orbit ring -->
+  <ellipse cx="380" cy="290" rx="125" ry="40" fill="none" stroke="url(#amber)" stroke-width="7" transform="rotate(-30 380 290)" filter="url(#glow)" opacity="0.85"/>
+  <!-- Orbiting body -->
+  <circle cx="450" cy="220" r="14" fill="#fbbf24" filter="url(#glow)"/>
+
+  <!-- Title text -->
+  <text x="600" y="270" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="42" font-weight="700" fill="#fbbf24" filter="url(#glow-soft)">Your attention is sacred.</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="330" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" fill="#ffffff" opacity="0.85">See your people. Make plans. Close the app.</text>
+
+  <!-- Domain -->
+  <text x="600" y="530" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#ffffff" opacity="0.35">orbyt.life</text>
+</svg>
